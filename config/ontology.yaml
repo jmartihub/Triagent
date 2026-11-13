@@ -1,0 +1,152 @@
+# Ontología del dominio de Soporte TI universitario (Tooli / GLPI)
+# Define clases, instancias, relaciones y competencias de resolución.
+
+servicios_plataformas:
+  teams:
+    nombre: "Microsoft Teams"
+    tipo: "Plataforma de Comunicación y Clases"
+    criticidad_base: "Alta"
+    grupo_responsable: "sistemas_academicos"
+  banner:
+    nombre: "Banner / Portal Estudiantil"
+    tipo: "Sistema de Registro y Gestión Académica"
+    criticidad_base: "Alta"
+    grupo_responsable: "sistemas_academicos"
+  red_wifi:
+    nombre: "Infraestructura de Red y Wi-Fi Campus"
+    tipo: "Red y Telecomunicaciones"
+    criticidad_base: "Crítica"
+    grupo_responsable: "infraestructura_redes"
+  correo:
+    nombre: "Correo Institucional (Exchange / Microsoft 365)"
+    tipo: "Identidad y Comunicación"
+    criticidad_base: "Media"
+    grupo_responsable: "infraestructura_redes"
+  pagos_linea:
+    nombre: "Portal Transaccional PSE / Pasarela de Pago"
+    tipo: "Financiero / Pasarela"
+    criticidad_base: "Alta"
+    grupo_responsable: "tesoreria_pagos"
+  accesos_cuentas:
+    nombre: "Directorio Activo y Autenticación Central"
+    tipo: "Seguridad e Identidad"
+    criticidad_base: "Alta"
+    grupo_responsable: "infraestructura_redes"
+  software_salas:
+    nombre: "Software Especializado en Laboratorios"
+    tipo: "Laboratorio y Software Local"
+    criticidad_base: "Media"
+    grupo_responsable: "soporte_salas_hardware"
+  computadores_fisicos:
+    nombre: "Hardware y Periféricos en Salas de Cómputo"
+    tipo: "Hardware Local"
+    criticidad_base: "Media"
+    grupo_responsable: "soporte_salas_hardware"
+  sala_virtual:
+    nombre: "Entorno VDI / Escritorio Remoto Estudiantes"
+    tipo: "Virtualización y Acceso Remoto"
+    criticidad_base: "Alta"
+    grupo_responsable: "soporte_salas_hardware"
+  liquidacion_matricula:
+    nombre: "Sistema de Liquidación y Facturación Académica"
+    tipo: "Financiero Académico"
+    criticidad_base: "Alta"
+    grupo_responsable: "tesoreria_pagos"
+
+grupos_soporte:
+  mesa_ayuda_nivel_1:
+    nombre: "Mesa de Ayuda - Nivel 1"
+    descripcion: "Atención inicial, orientación general, consultas simples y recepción de dudas."
+    escalamiento: "sistemas_academicos"
+  sistemas_academicos:
+    nombre: "Soporte de Sistemas Académicos"
+    descripcion: "Especialistas en Banner, Teams, Aulas Virtuales y Registro de Asignaturas."
+    escalamiento: "infraestructura_redes"
+  infraestructura_redes:
+    nombre: "Infraestructura, Redes y Telecomunicaciones"
+    descripcion: "Especialistas en conectividad Wi-Fi, switches, cortafuegos, servidores y correo."
+    escalamiento: "direccion_ti"
+  soporte_salas_hardware:
+    nombre: "Soporte de Salas de Cómputo y Hardware"
+    descripcion: "Atención física a equipos de cómputo, licencias de laboratorio y salas virtuales."
+    escalamiento: "infraestructura_redes"
+  tesoreria_pagos:
+    nombre: "Gestión Financiera y Pagos"
+    descripcion: "Atención de pagos en línea, liquidaciones, descuentos y bloqueos financieros."
+    escalamiento: "direccion_financiera"
+
+tecnicos:
+  - id: "TEC_01"
+    nombre: "Andrés Morales"
+    grupo: "infraestructura_redes"
+    rol: "Administrador de Redes y Telecomunicaciones"
+    especialidades: ["red_wifi", "correo", "accesos_cuentas"]
+    nivel: 2
+    correo: "andres.morales@universidad.edu.co"
+  - id: "TEC_02"
+    nombre: "Carolina Gómez"
+    grupo: "sistemas_academicos"
+    rol: "Especialista en Banner y Aulas Virtuales"
+    especialidades: ["banner", "teams", "matricula_academica"]
+    nivel: 2
+    correo: "carolina.gomez@universidad.edu.co"
+  - id: "TEC_03"
+    nombre: "David Herrera"
+    grupo: "soporte_salas_hardware"
+    rol: "Técnico de Laboratorios y Equipos"
+    especialidades: ["software_salas", "computadores_fisicos", "sala_virtual"]
+    nivel: 1
+    correo: "david.herrera@universidad.edu.co"
+  - id: "TEC_04"
+    nombre: "Elena Rivas"
+    grupo: "tesoreria_pagos"
+    rol: "Analista de Facturación y Recaudos"
+    especialidades: ["pagos_linea", "liquidacion_matricula", "matricula_financiera"]
+    nivel: 2
+    correo: "elena.rivas@universidad.edu.co"
+  - id: "TEC_05"
+    nombre: "Felipe Caicedo"
+    grupo: "mesa_ayuda_nivel_1"
+    rol: "Operador de Mesa de Ayuda"
+    especialidades: ["dudas_generales", "orientacion"]
+    nivel: 1
+    correo: "felipe.caicedo@universidad.edu.co"
+
+politicas_sla:
+  Crítica:
+    tiempo_max_resolucion_horas: 2.0
+    tiempo_primera_respuesta_minutos: 15
+    notificar_coordinador: true
+    descripcion: "Interrupción de servicios críticos que bloquean actividades académicas o exámenes con plazo inmediato."
+  Alta:
+    tiempo_max_resolucion_horas: 8.0
+    tiempo_primera_respuesta_minutos: 60
+    notificar_coordinador: false
+    descripcion: "Problemas que bloquean el trabajo individual con plazos cercanos y sin alternativa viable."
+  Media:
+    tiempo_max_resolucion_horas: 24.0
+    tiempo_primera_respuesta_minutos: 240
+    notificar_coordinador: false
+    descripcion: "Fallas que cuentan con alternativa temporal o consultas con plazos cercanos."
+  Baja:
+    tiempo_max_resolucion_horas: 72.0
+    tiempo_primera_respuesta_minutos: 480
+    notificar_coordinador: false
+    descripcion: "Dudas informativas o fallas menores que no impiden continuar las actividades."
+
+# Mapeo del formulario/apoyo hacia la plataforma en la ontología
+mapeo_apoyo_plataforma:
+  "Teams": "teams"
+  "Red / Wi-Fi": "red_wifi"
+  "Banner": "banner"
+  "Correo institucional": "correo"
+  "Pagos en línea": "pagos_linea"
+  "Accesos y contraseñas": "accesos_cuentas"
+  "Acceso a software": "software_salas"
+  "Funciones del computador": "computadores_fisicos"
+  "Sala virtual": "sala_virtual"
+  "Liquidación de comprobantes": "liquidacion_matricula"
+  "Recibos": "liquidacion_matricula"
+  "Medios de pago": "pagos_linea"
+  "Matrícula académica": "banner"
+  "Matrícula financiera": "liquidacion_matricula"

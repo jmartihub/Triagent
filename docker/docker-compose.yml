@@ -1,0 +1,44 @@
+version: "3.8"
+
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: glpi_database
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_ti
+      MYSQL_DATABASE: glpi_db
+      MYSQL_USER: glpi_user
+      MYSQL_PASSWORD: glpi_secure_password
+    volumes:
+      - glpi_db_data:/var/lib/mysql
+    networks:
+      - glpi_network
+
+  glpi:
+    image: diouxx/glpi:latest
+    container_name: glpi_app
+    restart: always
+    depends_on:
+      - mariadb
+    ports:
+      - "8080:80"
+    environment:
+      TIMEZONE: "America/Bogota"
+      MARIADB_HOST: mariadb
+      MARIADB_PORT: 3306
+      MARIADB_DATABASE: glpi_db
+      MARIADB_USER: glpi_user
+      MARIADB_PASSWORD: glpi_secure_password
+    volumes:
+      - glpi_data:/var/www/html/glpi
+    networks:
+      - glpi_network
+
+volumes:
+  glpi_db_data:
+  glpi_data:
+
+networks:
+  glpi_network:
+    driver: bridge

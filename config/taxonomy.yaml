@@ -1,0 +1,57 @@
+# Taxonomía de formularios de Tooli (marketplace/formcreator).
+# Fuente: lista de categorías que ve el estudiante al crear una solicitud.
+# Todos los formularios comparten: Asunto, Descripción y adjuntar documentos.
+# Lo que cambia por formulario: la lista "¿Qué apoyo necesitas?" y algunas preguntas
+# extra (p. ej. programa relacionado en Centro de Idiomas).
+#
+# nucleo: true  -> formularios sobre los que se entrena el agente (TI + confundibles)
+# provisional: true -> la lista de apoyos NO está confirmada contra el formulario real;
+#                      se dedujo de la descripción de la categoría. Corregir aquí y
+#                      volver a generar los datos.
+
+campos_comunes: [asunto, descripcion, adjuntos]
+
+formularios:
+  - {id: 159, nombre: "Actividad Docente y Clases", nucleo: false}
+  - {id: 162, nombre: "Avance Académico y Grados", nucleo: false}
+  - {id: 166, nombre: "Biblioteca", nucleo: false}
+  - id: 164
+    nombre: "Centro de Idiomas"
+    nucleo: false
+    apoyos: ["Dudas sobre el curso de idiomas", "Dudas sobre el examen de clasificación", "Otra"]
+    provisional: false
+    campos_extra: [programa_relacionado]
+  - {id: 173, nombre: "Deporte y Cultura (CDC)", nucleo: false}
+  - {id: 172, nombre: "Excelencia Docente y Apoyo al Aprendizaje (EXDA)", nucleo: false}
+  - id: 169
+    nombre: "Fallas Técnicas TIC"
+    nucleo: true
+    descripcion: "Fallas técnicas: TEAMS, red, Banner, correo, pagos y accesos."
+    apoyos: ["Teams", "Red / Wi-Fi", "Banner", "Correo institucional", "Pagos en línea", "Accesos y contraseñas", "Otra"]
+    provisional: true
+  - {id: 167, nombre: "Intersemetrales", nucleo: false}
+  - {id: 158, nombre: "Notas, Promedios y Situación", nucleo: false}
+  - {id: 160, nombre: "Orientación sobre mi Programa", nucleo: false}
+  - {id: 174, nombre: "Participación Estudiantil (PE)", nucleo: false}
+  - id: 165
+    nombre: "Procesos de Pago"
+    nucleo: true
+    descripcion: "Liquidación de comprobantes, recibos y orientación sobre medios de pago."
+    apoyos: ["Liquidación de comprobantes", "Recibos", "Medios de pago"]
+    provisional: true
+  - {id: 161, nombre: "Prácticas y Conexiones profesionales", nucleo: false}
+  - id: 168
+    nombre: "Salas de Cómputo"
+    nucleo: true
+    descripcion: "Soporte de software, equipos y sala virtual."
+    apoyos: ["Acceso a software", "Funciones del computador", "Sala virtual", "Otra"]
+    provisional: true
+  - id: 110
+    nombre: "Soporte Durante Matrícula Académica"
+    nucleo: true
+    descripcion: "Inconvenientes y solicitudes del proceso de matrícula académica y financiera."
+    apoyos: ["Matrícula académica", "Matrícula financiera"]
+    provisional: true
+
+# Niveles de urgencia que el agente escribe en GLPI (ver src/triage/rubric.py).
+urgencias: [Baja, Media, Alta, Crítica]

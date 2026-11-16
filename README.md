@@ -19,14 +19,20 @@ python main.py demo
 # 3. Probar en vivo en modo interactivo (redacta cualquier ticket por teclado)
 python main.py interactivo
 
-# 4. Entrenar y evaluar todos los modelos (ML clásico, Deep Learning, Regresión SLA)
+# 4. Iniciar el dashboard web (simulador, cola GLPI y métricas)
+python main.py web
+
+# 5. Entrenar y evaluar todos los modelos (ML clásico, Deep Learning, Regresión SLA)
 python main.py all
 
-# 5. Ejecutar toda la suite de pruebas unitarias y de integración
+# 6. Ejecutar toda la suite de pruebas unitarias y de integración
 python tests/test_rubric.py
 python tests/test_reasoning.py
 python tests/test_agent_full.py
+python tests/test_dashboard.py
 ```
+
+El resumen del dashboard se calcula con los últimos 1.000 tickets consultados. El cumplimiento de SLA se muestra solo cuando GLPI entrega tanto la fecha límite como la fecha de resolución; si esos datos no existen, se indica como no disponible.
 
 Otros comandos individuales:
 - `python main.py deep`: Entrena y evalúa la variante de Deep Learning (Red Neuronal Multicapa MLP).

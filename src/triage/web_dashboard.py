@@ -13,7 +13,7 @@ Servidor HTTP en Python para la interfaz institucional de gestion y control:
 """
 
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
@@ -27,6 +27,101 @@ sys.path.insert(0, str(RAIZ / "src"))
 
 from triage.agent import AgenteTriaje
 from triage.glpi_client import ClienteGLPI
+
+
+URGENCIAS_GLPI = {
+    1: "Baja",
+    2: "Baja",
+    3: "Media",
+    4: "Alta",
+    5: "Crítica",
+}
+ESTADOS_GLPI = {
+    1: "Nuevo",
+    2: "En curso / Asignado",
+    3: "Planificado",
+    4: "En espera",
+    5: "Resuelto",
+    6: "Cerrado",
+}
+
+
+def _urgencia_ticket(ticket):
+    urgencia = ticket.get("urgency")
+    try:
+        return URGENCIAS_GLPI.get(int(urgencia))
+    except (TypeError, ValueError):
+        if isinstance(urgencia, str):
+            urgencia_normalizada = urgencia.strip().casefold()
+            return next(
+                (nombre for nombre in URGENCIAS_GLPI.values() if nombre.casefold() == urgencia_normalizada),
+                None,
+            )
+        return None
+
+
+def _estado_ticket(ticket):
+    estado = ticket.get("status")
+    try:
+        return int(estado)
+    except (TypeError, ValueError):
+        if isinstance(estado, str):
+            estado_normalizado = estado.strip().casefold()
+            return next(
+                (codigo for codigo, nombre in ESTADOS_GLPI.items() if nombre.casefold() == estado_normalizado),
+                None,
+            )
+        return None
+
+
+def _fecha_glpi(valor):
+    if not isinstance(valor, str) or not valor.strip():
+        return None
+    try:
+        fecha = datetime.fromisoformat(valor.strip().replace("Z", "+00:00"))
+        if fecha.tzinfo:
+            fecha = fecha.astimezone(timezone.utc).replace(tzinfo=None)
+        return fecha
+    except ValueError:
+        return None
+
+
+def resumir_tickets(tickets):
+    """Calcula métricas únicamente con los datos que GLPI devuelve."""
+    urgencias = {"Crítica": 0, "Alta": 0, "Media": 0, "Baja": 0}
+    activos = 0
+    resueltos = 0
+    sla_evaluados = 0
+    sla_cumplidos = 0
+
+    for ticket in tickets:
+        estado = _estado_ticket(ticket)
+        if estado in (5, 6):
+            resueltos += 1
+            fecha_limite = _fecha_glpi(ticket.get("time_to_resolve"))
+            fecha_resolucion = _fecha_glpi(ticket.get("solvedate"))
+            if fecha_limite and fecha_resolucion:
+                sla_evaluados += 1
+                sla_cumplidos += fecha_resolucion <= fecha_limite
+        else:
+            activos += 1
+
+        urgencia = _urgencia_ticket(ticket)
+        if urgencia:
+            urgencias[urgencia] += 1
+
+    return {
+        "total": len(tickets),
+        "activos": activos,
+        "resueltos": resueltos,
+        "urgencias": urgencias,
+        "sin_urgencia": len(tickets) - sum(urgencias.values()),
+        "sla": {
+            "cumplimiento_pct": round(sla_cumplidos * 100 / sla_evaluados, 1) if sla_evaluados else None,
+            "evaluados": sla_evaluados,
+        },
+    }
+
 
 HTML_INDEX = """<!DOCTYPE html>
 <html lang="es">
@@ -55,8 +150,8 @@ HTML_INDEX = """<!DOCTYPE html>
         </p>
       </div>
       <div class="flex items-center gap-3 mt-4 md:mt-0">
-        <span id="glpi-status" class="px-2.5 py-1 text-xs rounded bg-slate-900 text-emerald-400 border border-emerald-800 font-mono">
-          GLPI: Conectado (Port 8080)
+        <span id="glpi-status" class="px-2.5 py-1 text-xs rounded bg-slate-900 text-slate-400 border border-slate-800 font-mono">
+          GLPI: Consultando...
         </span>
         <a href="http://localhost:8080" target="_blank" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded border border-slate-700 transition">
           Consola GLPI
@@ -71,7 +166,7 @@ HTML_INDEX = """<!DOCTYPE html>
           <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300">
             Resumen Administrativo · Estado de la Mesa de Ayuda
           </h2>
-          <p class="text-[11px] text-slate-500">Métricas consolidadas de tickets, distribución de urgencias y carga operativa</p>
+          <p class="text-[11px] text-slate-500">Hasta 1.000 tickets recientes de GLPI; el SLA se calcula solo con fechas disponibles</p>
         </div>
         <button onclick="cargarMetricasYCola()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded border border-slate-700 transition">
           Actualizar Datos
@@ -113,7 +208,7 @@ HTML_INDEX = """<!DOCTYPE html>
         <div class="bg-slate-950 p-3 rounded border border-emerald-950">
           <span class="text-[10px] uppercase font-medium text-emerald-400 block">Resueltos</span>
           <span id="kpi-resueltos" class="text-lg font-bold text-emerald-400 font-mono">0</span>
-          <span id="kpi-sla" class="text-[10px] text-emerald-400/70 block mt-0.5">SLA: 95.2%</span>
+          <span id="kpi-sla" class="text-[10px] text-emerald-400/70 block mt-0.5">SLA: N/D</span>
         </div>
       </div>
 
@@ -121,7 +216,7 @@ HTML_INDEX = """<!DOCTYPE html>
       <div>
         <div class="flex justify-between text-[10px] text-slate-400 mb-1">
           <span>Distribución por Severidad</span>
-          <span id="distribucion-label">Calculando...</span>
+          <span id="distribucion-label">Consultando tickets...</span>
         </div>
         <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden flex">
           <div id="bar-critica" style="width: 0%" class="bg-rose-600 transition-all duration-300" title="Crítica"></div>
@@ -281,19 +376,19 @@ HTML_INDEX = """<!DOCTYPE html>
     <section id="sec-cola" class="hidden bg-slate-900 p-5 rounded-lg border border-slate-800">
       <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
         <div>
-          <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Tickets Registrados en GLPI</h2>
-          <p class="text-xs text-slate-400">Lectura directa de tickets activos en la base de datos MariaDB</p>
+          <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Tickets Recientes Registrados en GLPI</h2>
+          <p class="text-xs text-slate-400">Hasta 1.000 solicitudes, con estado y urgencia actuales</p>
         </div>
       <!-- Filtros Rapidos y Buscador -->
       <div class="flex flex-col sm:flex-row gap-2 items-center justify-between mb-3 text-xs">
         <div class="flex gap-1.5 flex-wrap">
-          <button onclick="filtrarTickets('todos')" id="filtro-todos" class="px-2.5 py-1 rounded bg-slate-800 text-white border border-slate-700 font-medium">Todos</button>
-          <button onclick="filtrarTickets('Crítica')" id="filtro-critica" class="px-2.5 py-1 rounded bg-slate-950 text-rose-400 border border-slate-800 hover:border-rose-800">Crítica</button>
-          <button onclick="filtrarTickets('Alta')" id="filtro-alta" class="px-2.5 py-1 rounded bg-slate-950 text-amber-400 border border-slate-800 hover:border-amber-800">Alta</button>
-          <button onclick="filtrarTickets('Media')" id="filtro-media" class="px-2.5 py-1 rounded bg-slate-950 text-blue-400 border border-slate-800 hover:border-blue-800">Media</button>
-          <button onclick="filtrarTickets('Baja')" id="filtro-baja" class="px-2.5 py-1 rounded bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-600">Baja</button>
-          <button onclick="filtrarTickets('Nuevo')" id="filtro-nuevo" class="px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800 hover:border-slate-600">Nuevos</button>
-          <button onclick="filtrarTickets('En curso')" id="filtro-encurso" class="px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800 hover:border-slate-600">En curso</button>
+          <button onclick="filtrarTickets('todos')" id="filtro-todos" class="filter-btn px-2.5 py-1 rounded bg-slate-800 text-white border border-slate-700 font-medium">Todos</button>
+          <button onclick="filtrarTickets('Crítica')" id="filtro-critica" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">Crítica</button>
+          <button onclick="filtrarTickets('Alta')" id="filtro-alta" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">Alta</button>
+          <button onclick="filtrarTickets('Media')" id="filtro-media" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">Media</button>
+          <button onclick="filtrarTickets('Baja')" id="filtro-baja" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">Baja</button>
+          <button onclick="filtrarTickets('Nuevo')" id="filtro-nuevo" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">Nuevos</button>
+          <button onclick="filtrarTickets('En curso')" id="filtro-encurso" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">En curso</button>
         </div>
         <div class="w-full sm:w-64">
           <input type="text" id="busqueda-ticket" oninput="buscarTicket()" placeholder="Filtrar por asunto, ID..." class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600 text-xs">
@@ -338,6 +433,28 @@ HTML_INDEX = """<!DOCTYPE html>
       'Media': 'badge-media',
       'Baja': 'badge-baja'
     };
+    const ESTADOS = {
+      1: 'Nuevo',
+      2: 'En curso / Asignado',
+      3: 'Planificado',
+      4: 'En espera',
+      5: 'Resuelto',
+      6: 'Cerrado'
+    };
+    let ticketsCargados = [];
+    let filtroActual = 'todos';
+
+    function escaparHTML(valor) {
+      return String(valor ?? '').replace(/[&<>"']/g, caracter => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[caracter]);
+    }
+
+    async function obtenerJSON(url, opciones) {
+      const resp = await fetch(url, opciones);
+      if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
+      return resp.json();
+    }
 
     function cambiarPestana(nombre) {
       document.querySelectorAll('.tab-btn').forEach(b => {
@@ -350,8 +467,52 @@ HTML_INDEX = """<!DOCTYPE html>
       document.getElementById('sec-ontologia').classList.add('hidden');
       document.getElementById('sec-' + nombre).classList.remove('hidden');
 
-      if (nombre === 'cola') cargarColaTickets();
+      if (nombre === 'cola') cargarMetricasYCola();
       if (nombre === 'ontologia') cargarOntologia();
+    }
+
+    async function cargarMetricasYCola() {
+      const label = document.getElementById('distribucion-label');
+      label.innerText = 'Consultando tickets...';
+      try {
+        const data = await obtenerJSON('/api/dashboard');
+        ticketsCargados = data.tickets || [];
+        renderizarMetricas(data.metricas);
+        document.getElementById('glpi-status').innerText = data.glpi_mock
+          ? 'GLPI: Modo simulado'
+          : 'GLPI: Conectado';
+        document.getElementById('glpi-status').className = data.glpi_mock
+          ? 'px-2.5 py-1 text-xs rounded bg-slate-900 text-amber-400 border border-amber-800 font-mono'
+          : 'px-2.5 py-1 text-xs rounded bg-slate-900 text-emerald-400 border border-emerald-800 font-mono';
+        document.getElementById('count-tickets').innerText = ticketsCargados.length;
+        renderizarTickets();
+      } catch (err) {
+        label.innerText = 'No fue posible cargar las métricas';
+        document.getElementById('glpi-status').innerText = 'GLPI: Sin datos';
+        document.getElementById('glpi-status').className = 'px-2.5 py-1 text-xs rounded bg-slate-900 text-rose-400 border border-rose-800 font-mono';
+      }
+    }
+
+    function renderizarMetricas(m) {
+      if (!m) throw new Error('La respuesta de métricas está incompleta');
+      const niveles = ['Crítica', 'Alta', 'Media', 'Baja'];
+      document.getElementById('kpi-total').innerText = m.total;
+      document.getElementById('kpi-activos').innerText = `${m.activos} activos`;
+      document.getElementById('kpi-resueltos').innerText = m.resueltos;
+      document.getElementById('kpi-sla').innerText = m.sla.cumplimiento_pct === null
+        ? `SLA: N/D (${m.sla.evaluados} evaluables)`
+        : `SLA: ${m.sla.cumplimiento_pct}% (${m.sla.evaluados} evaluables)`;
+
+      niveles.forEach((nivel, indice) => {
+        const id = ['critica', 'alta', 'media', 'baja'][indice];
+        const cantidad = m.urgencias[nivel] || 0;
+        const porcentaje = m.total ? cantidad * 100 / m.total : 0;
+        document.getElementById(`kpi-${id}`).innerText = cantidad;
+        document.getElementById(`kpi-${id}-pct`).innerText = `${porcentaje.toFixed(1)}% del total`;
+        document.getElementById(`bar-${id}`).style.width = `${porcentaje}%`;
+      });
+      document.getElementById('distribucion-label').innerText =
+        `${m.total} tickets · ${m.sin_urgencia} sin urgencia clasificada`;
     }
 
     async function enviarTicket(e) {
@@ -373,8 +534,10 @@ HTML_INDEX = """<!DOCTYPE html>
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+        if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
         const data = await resp.json();
         renderizarResultado(data);
+        await cargarMetricasYCola();
       } catch (err) {
         alert('Error al conectar con el servidor: ' + err);
       } finally {
@@ -384,7 +547,7 @@ HTML_INDEX = """<!DOCTYPE html>
     }
 
     function renderizarResultado(d) {
-      document.getElementById('ticket-id-tag').innerText = 'Ticket #' + d.id_ticket + ' (GLPI)';
+      document.getElementById('ticket-id-tag').innerText = `Ticket #${d.id_ticket}`;
 
       // Urgencia
       const urgEl = document.getElementById('res-urgencia');
@@ -437,61 +600,94 @@ HTML_INDEX = """<!DOCTYPE html>
 
       // Lista FOL
       const listEl = document.getElementById('res-fol-list');
-      listEl.innerHTML = d.justificacion_fol.map(f => `<li>${f}</li>`).join('') || '<li>Inferencia directa estándar</li>';
+      listEl.innerHTML = (d.justificacion_fol || []).map(f => `<li>${escaparHTML(f)}</li>`).join('') || '<li>Inferencia directa estándar</li>';
 
       // Respuesta
       document.getElementById('res-respuesta').innerText = d.respuesta_preliminar;
-      document.getElementById('sync-glpi-msg').innerText = 'Sincronizado con GLPI (ID: #' + d.id_ticket + ')';
+      document.getElementById('sync-glpi-msg').innerText = d.glpi_sincronizado
+        ? `Sincronizado con GLPI (ID: #${d.id_ticket})`
+        : 'Ticket procesado, pero no se pudo sincronizar con GLPI';
     }
 
-    async function cargarColaTickets() {
+    function filtrarTickets(filtro) {
+      filtroActual = filtro;
+      document.querySelectorAll('.filter-btn').forEach(boton => {
+        const activo = boton.id === `filtro-${filtro.toLocaleLowerCase().replace('í', 'i').replace(' ', '')}`;
+        boton.className = `filter-btn px-2.5 py-1 rounded border ${activo
+          ? 'bg-slate-800 text-white border-slate-700 font-medium'
+          : 'bg-slate-950 text-slate-400 border-slate-800'}`;
+      });
+      renderizarTickets();
+    }
+
+    function buscarTicket() {
+      renderizarTickets();
+    }
+
+    function renderizarTickets() {
       const tbody = document.getElementById('tabla-tickets');
-      tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">Consultando GLPI...</td></tr>';
-      try {
-        const resp = await fetch('/api/tickets');
-        const tickets = await resp.json();
-        document.getElementById('count-tickets').innerText = tickets.length;
+      const consulta = document.getElementById('busqueda-ticket').value.trim().toLocaleLowerCase();
+      const filtrados = ticketsCargados.filter(ticket => {
+        const urgencia = urgenciaNombre(ticket.urgency);
+        const estado = Number(ticket.status);
+        const cumpleFiltro = filtroActual === 'todos'
+          || filtroActual === urgencia
+          || (filtroActual === 'Nuevo' && estado === 1)
+          || (filtroActual === 'En curso' && [2, 3, 4].includes(estado));
+        const texto = `${ticket.id ?? ''} ${ticket.name ?? ''} ${ticket.content ?? ''}`.toLocaleLowerCase();
+        return cumpleFiltro && texto.includes(consulta);
+      });
 
-        if (tickets.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">No hay tickets registrados en GLPI.</td></tr>';
-          return;
-        }
-
-        tbody.innerHTML = tickets.map(t => {
-          const urgNombre = t.urgency === 5 ? 'Crítica' : (t.urgency === 4 ? 'Alta' : (t.urgency === 3 ? 'Media' : 'Baja'));
-          const estadoNombre = t.status === 1 ? 'Nuevo' : (t.status === 2 ? 'En curso / Asignado' : 'Resuelto');
-          return `
-            <tr class="hover:bg-slate-950">
-              <td class="p-2.5 font-mono text-slate-400">#${t.id}</td>
-              <td class="p-2.5 font-medium text-slate-200">${t.name}</td>
-              <td class="p-2.5 text-slate-400 font-mono">${t.date || '-'}</td>
-              <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] ${t.status === 1 ? 'bg-slate-800 text-slate-300' : 'bg-slate-800 text-slate-300'}">${estadoNombre}</span></td>
-              <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-semibold ${NIVELES_COLOR[urgNombre] || 'bg-slate-800'}">${urgNombre}</span></td>
-              <td class="p-2.5">
-                <button onclick="corregirHumano(${t.id})" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded border border-slate-700 transition">
-                  Corregir (Feedback)
-                </button>
-              </td>
-            </tr>
-          `;
-        }).join('');
-      } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-rose-400">Error al consultar GLPI: ${err}</td></tr>`;
+      document.getElementById('count-tickets').innerText = filtrados.length;
+      if (!filtrados.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-500">${
+          ticketsCargados.length ? 'No hay tickets que coincidan con el filtro.' : 'No hay tickets registrados en GLPI.'
+        }</td></tr>`;
+        return;
       }
+
+      tbody.innerHTML = filtrados.map(ticket => {
+        const urgencia = urgenciaNombre(ticket.urgency) || 'Sin clasificar';
+        const estado = Number(ticket.status);
+        const estadoNombre = ESTADOS[estado] || 'Desconocido';
+        const id = Number.parseInt(ticket.id, 10);
+        const botonFeedback = Number.isSafeInteger(id)
+          ? `<button onclick="corregirHumano(${id})" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded border border-slate-700 transition">Corregir (Feedback)</button>`
+          : '<span class="text-slate-500">No disponible</span>';
+        return `
+          <tr class="hover:bg-slate-950">
+            <td class="p-2.5 font-mono text-slate-400">#${escaparHTML(ticket.id)}</td>
+            <td class="p-2.5 font-medium text-slate-200">${escaparHTML(ticket.name || ticket.content || '(Sin asunto)')}</td>
+            <td class="p-2.5 text-slate-400 font-mono">${escaparHTML(ticket.date || '-')}</td>
+            <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">${estadoNombre}</span></td>
+            <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-semibold ${NIVELES_COLOR[urgencia] || 'bg-slate-800 text-slate-400'}">${urgencia}</span></td>
+            <td class="p-2.5">${botonFeedback}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function urgenciaNombre(valor) {
+      const numero = Number(valor);
+      if (numero === 1 || numero === 2) return 'Baja';
+      if (numero === 3) return 'Media';
+      if (numero === 4) return 'Alta';
+      if (numero === 5) return 'Crítica';
+      return Object.keys(NIVELES_COLOR).find(nivel => nivel.toLocaleLowerCase() === String(valor).toLocaleLowerCase()) || null;
     }
 
     async function corregirHumano(id) {
       const nuevaUrg = prompt('Ingresa la corrección de urgencia (Crítica, Alta, Media, Baja):', 'Alta');
       if (!nuevaUrg) return;
       try {
-        const resp = await fetch('/api/feedback', {
+        const res = await obtenerJSON('/api/feedback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id_ticket: id, urgencia_corregida: nuevaUrg })
         });
-        const res = await resp.json();
+        if (!res.ok) throw new Error(res.mensaje || 'No se pudo registrar la corrección');
         alert('Corrección registrada. El agente ahora utilizará este aprendizaje para casos similares.');
-        cargarColaTickets();
+        await cargarMetricasYCola();
       } catch (e) {
         alert('Error: ' + e);
       }
@@ -500,20 +696,19 @@ HTML_INDEX = """<!DOCTYPE html>
     async function cargarOntologia() {
       const cont = document.getElementById('grid-tecnicos');
       try {
-        const resp = await fetch('/api/ontologia');
-        const data = await resp.json();
+        const data = await obtenerJSON('/api/ontologia');
         cont.innerHTML = data.tecnicos.map(t => `
           <div class="bg-slate-950 p-3.5 rounded border border-slate-800">
-            <h4 class="font-bold text-xs text-slate-200">${t.nombre}</h4>
-            <p class="text-[11px] text-slate-400 mb-2">${t.rol}</p>
-            <p class="text-[11px] text-slate-500 mb-2">Grupo: <span class="text-slate-300">${t.grupo}</span></p>
+            <h4 class="font-bold text-xs text-slate-200">${escaparHTML(t.nombre)}</h4>
+            <p class="text-[11px] text-slate-400 mb-2">${escaparHTML(t.rol)}</p>
+            <p class="text-[11px] text-slate-500 mb-2">Grupo: <span class="text-slate-300">${escaparHTML(t.grupo)}</span></p>
             <div class="text-[10px] text-slate-400">
-              Especialidades: ${t.especialidades.map(e => `<span class="bg-slate-900 border border-slate-800 px-1 py-0.5 rounded text-slate-300 mr-1">${e}</span>`).join('')}
+              Especialidades: ${t.especialidades.map(e => `<span class="bg-slate-900 border border-slate-800 px-1 py-0.5 rounded text-slate-300 mr-1">${escaparHTML(e)}</span>`).join('')}
             </div>
           </div>
         `).join('');
       } catch (e) {
-        cont.innerHTML = `<p class="text-rose-400">Error: ${e}</p>`;
+        cont.innerHTML = `<p class="text-rose-400">${escaparHTML(`Error: ${e}`)}</p>`;
       }
     }
 
@@ -531,7 +726,7 @@ HTML_INDEX = """<!DOCTYPE html>
       }
     }
 
-    cargarColaTickets();
+    cargarMetricasYCola();
   </script>
 </body>
 </html>
@@ -545,6 +740,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
+    def obtener_tickets_dashboard(self):
+        if not self.cliente_glpi:
+            return []
+        return self.cliente_glpi.obtener_todos_los_tickets(limite=1000)
+
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
 
@@ -555,21 +755,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.wfile.write(HTML_INDEX.encode("utf-8"))
             return
 
+        if url.path == "/api/dashboard":
+            tickets = self.obtener_tickets_dashboard()
+            self.enviar_json({
+                "tickets": tickets,
+                "metricas": resumir_tickets(tickets),
+                "glpi_mock": not self.cliente_glpi or self.cliente_glpi.modo_mock,
+            })
+            return
+
         if url.path == "/api/tickets":
-            tickets = []
-            if self.cliente_glpi:
-                tickets = self.cliente_glpi.obtener_tickets_nuevos()
-                if not tickets and not self.cliente_glpi.modo_mock and self.cliente_glpi.session_token:
-                    try:
-                        req = urllib.request.Request(
-                            f"{self.cliente_glpi.url_base}/Ticket?is_deleted=0",
-                            headers={"Session-Token": self.cliente_glpi.session_token},
-                        )
-                        with urllib.request.urlopen(req, timeout=3) as r:
-                            tickets = json.loads(r.read().decode())
-                    except Exception:
-                        pass
-            self.enviar_json(tickets)
+            self.enviar_json(self.obtener_tickets_dashboard())
             return
 
         if url.path == "/api/ontologia":
@@ -588,14 +784,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
         post_body = self.rfile.read(content_len).decode("utf-8") if content_len > 0 else "{}"
         try:
             datos = json.loads(post_body)
-        except Exception:
-            datos = {}
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self.send_error(400, "Invalid JSON")
+            return
+        if not isinstance(datos, dict):
+            self.send_error(400, "JSON object required")
+            return
 
         if url.path == "/api/triajar":
             asunto = datos.get("asunto", "")
             descripcion = datos.get("descripcion", "")
+            if not isinstance(asunto, str) or not asunto.strip() or not isinstance(descripcion, str) or not descripcion.strip():
+                self.send_error(400, "Asunto y descripción son obligatorios")
+                return
             form = datos.get("formulario_elegido", "Fallas Técnicas TIC")
             apoyo = datos.get("apoyo", "Otra")
+            if not isinstance(form, str) or not isinstance(apoyo, str):
+                self.send_error(400, "Formulario y apoyo deben ser texto")
+                return
 
             id_glpi = None
             if self.cliente_glpi:
@@ -612,25 +818,31 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
             decision = self.agente.procesar_ticket(ticket_sim)
 
+            glpi_sincronizado = False
             if self.cliente_glpi and id_glpi:
-                self.cliente_glpi.actualizar_ticket(
+                ticket_actualizado = self.cliente_glpi.actualizar_ticket(
                     id_ticket=id_glpi,
                     urgencia_nombre=decision.urgencia_final,
                     tecnico_nombre=decision.tecnico_asignado,
                     formulario_nombre=decision.formulario_final,
                 )
-                self.cliente_glpi.registrar_respuesta_preliminar(
+                respuesta_registrada = self.cliente_glpi.registrar_respuesta_preliminar(
                     id_ticket=id_glpi,
                     respuesta_texto=decision.respuesta_preliminar,
                 )
+                glpi_sincronizado = ticket_actualizado and respuesta_registrada
 
             res = asdict(decision)
+            res["glpi_sincronizado"] = glpi_sincronizado
             self.enviar_json(res)
             return
 
         if url.path == "/api/feedback":
             id_t = str(datos.get("id_ticket", ""))
-            urg_corregida = datos.get("urgencia_corregida", "Alta")
+            urg_corregida = datos.get("urgencia_corregida")
+            if not id_t or urg_corregida not in ("Crítica", "Alta", "Media", "Baja"):
+                self.send_error(400, "Ticket y urgencia válidos son obligatorios")
+                return
             asunto = ""
             desc = ""
 
@@ -648,8 +860,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         glpi_tk = json.loads(r.read().decode())
                         asunto = glpi_tk.get("name", "")
                         desc = glpi_tk.get("content", "")
-                except Exception:
-                    pass
+                except (OSError, json.JSONDecodeError):
+                    self.enviar_json({"ok": False, "mensaje": "No se pudo consultar el ticket en GLPI."})
+                    return
 
             self.agente.memoria.registrar_feedback_humano(
                 id_ticket=id_t,

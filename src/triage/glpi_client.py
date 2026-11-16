@@ -104,10 +104,12 @@ class ClienteGLPI:
 
     def obtener_todos_los_tickets(self, limite: int = 100) -> List[Dict[str, Any]]:
         """Obtiene el listado completo de tickets ordenados de más reciente a más antiguo."""
+        if limite <= 0:
+            return []
         if self.modo_mock or not self.session_token:
             return sorted(self.tickets_mock.values(), key=lambda t: t.get("id", 0), reverse=True)[:limite]
 
-        url = f"{self.url_base}/Ticket?is_deleted=0&range=0-{limite}&order=DESC"
+        url = f"{self.url_base}/Ticket?is_deleted=0&range=0-{limite - 1}&order=DESC"
         req = urllib.request.Request(
             url,
             headers={

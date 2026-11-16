@@ -33,7 +33,7 @@ def test_ontology_routing():
     assert asig_wifi.tiempo_max_resolucion_horas == 8.0
     assert "Andrés Morales" in asig_wifi.tecnico_nombre
 
-    print("✓ Ontología: Enrutamiento y SLA correctos")
+    print("[OK] Ontologia: Enrutamiento y SLA correctos")
 
 
 def test_fol_inference():
@@ -83,7 +83,7 @@ def test_fol_inference():
     assert res_duda.urgencia_deducida == "Baja"
     assert "FOL-R03" in res_duda.reglas_disparadas
 
-    print("✓ FOL: Inferencia deductiva, cláusulas de Horn y red de seguridad correctas")
+    print("[OK] FOL: Inferencia deductiva, clausulas de Horn y red de seguridad correctas")
 
 
 if __name__ == "__main__":

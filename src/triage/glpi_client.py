@@ -102,6 +102,29 @@ class ClienteGLPI:
         except Exception:
             return []
 
+    def obtener_todos_los_tickets(self, limite: int = 100) -> List[Dict[str, Any]]:
+        """Obtiene el listado completo de tickets ordenados de más reciente a más antiguo."""
+        if self.modo_mock or not self.session_token:
+            return sorted(self.tickets_mock.values(), key=lambda t: t.get("id", 0), reverse=True)[:limite]
+
+        url = f"{self.url_base}/Ticket?is_deleted=0&range=0-{limite}&order=DESC"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Session-Token": self.session_token,
+                "Content-Type": "application/json",
+            },
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                todos = json.loads(resp.read().decode())
+                if isinstance(todos, list):
+                    return sorted(todos, key=lambda t: t.get("id", 0), reverse=True)
+                return []
+        except Exception:
+            return sorted(self.tickets_mock.values(), key=lambda t: t.get("id", 0), reverse=True)
+
     def crear_ticket(self, nombre: str, contenido: str, urgencia_inicial: int = 3) -> Optional[int]:
         """Crea un ticket en GLPI (usado por el simulador de Tooli/estudiante)."""
         if self.modo_mock or not self.session_token:

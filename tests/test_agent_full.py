@@ -28,7 +28,7 @@ def test_ciclo_completo_agente():
     assert decision.tiempo_sla_horas == 2.0
     assert len(decision.respuesta_preliminar) > 50
     assert decision.seguridad_ml_activada is True  # Rescatado por la red de seguridad FOL
-    print("✓ Ciclo completo del agente: Inferencia, enrutamiento y respuesta preliminar correctos")
+    print("[OK] Ciclo completo del agente: Inferencia, enrutamiento y respuesta preliminar correctos")
 
 
 def test_deteccion_formulario_erroneo():
@@ -47,8 +47,8 @@ def test_deteccion_formulario_erroneo():
     assert decision.hubo_cambio_formulario is True
     assert decision.formulario_final == "Procesos de Pago"
     assert "Gestión Financiera" in decision.grupo_asignado
-    assert "Ajuste de Categoría" in decision.respuesta_preliminar
-    print("✓ Detección y corrección de formulario erróneo correcta")
+    assert "Ajuste de Categoria" in decision.respuesta_preliminar
+    print("[OK] Detección y corrección de formulario erróneo correcta")
 
 
 def test_integracion_glpi_mock():
@@ -63,13 +63,13 @@ def test_integracion_glpi_mock():
         formulario_nombre="Fallas Técnicas TIC",
     )
     assert ok_upd is True
-    assert cliente.tickets_mock[101]["urgencia"] == 5
+    assert cliente.tickets_mock[101]["urgency"] == 5
 
     # Registrar respuesta preliminar
     ok_resp = cliente.registrar_respuesta_preliminar(101, "Hola, hemos recibido tu ticket.")
     assert ok_resp is True
     assert len(cliente.seguimientos_mock[101]) == 1
-    print("✓ Integración y actualización verificable en GLPI correcta")
+    print("[OK] Integración y actualización verificable en GLPI correcta")
 
 
 if __name__ == "__main__":

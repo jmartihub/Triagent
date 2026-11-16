@@ -34,7 +34,7 @@ class DetectorIncidentesNoSupervisado:
         self,
         umbral_duplicado: float = 0.75,
         eps_dbscan: float = 0.75,
-        min_muestras_masivo: int = 2,
+        min_muestras_masivo: int = 3,
         ventana_horas: float = 3.0,
     ):
         self.umbral_duplicado = umbral_duplicado
@@ -50,7 +50,7 @@ class DetectorIncidentesNoSupervisado:
         )
         self.buffer_tickets: List[Dict[str, Any]] = []
 
-    def registrar_ticket(self, ticket: Dict[str, Any]):
+    def registrar_ticket(self, ticket: Dict[str, Any], tipo: str = "falla"):
         """Agrega un ticket a la memoria de trabajo temporal."""
         if "fecha_apertura" not in ticket or not ticket["fecha_apertura"]:
             fecha_dt = datetime.now()
@@ -64,6 +64,7 @@ class DetectorIncidentesNoSupervisado:
 
         copia = dict(ticket)
         copia["fecha_dt"] = fecha_dt
+        copia["tipo"] = tipo
         form = ticket.get("formulario_elegido", "")
         apoyo = ticket.get("apoyo", "")
         asunto = ticket.get("asunto", "")
@@ -71,9 +72,9 @@ class DetectorIncidentesNoSupervisado:
         copia["texto_completo"] = f"{form} | {apoyo} | {asunto} | {desc}".strip()
         self.buffer_tickets.append(copia)
 
-    def analizar_ticket(self, nuevo_ticket: Dict[str, Any]) -> ResultadoClustering:
+    def analizar_ticket(self, nuevo_ticket: Dict[str, Any], tipo: str = "falla") -> ResultadoClustering:
         """Examina un ticket entrante contra la memoria de tickets recientes."""
-        self.registrar_ticket(nuevo_ticket)
+        self.registrar_ticket(nuevo_ticket, tipo=tipo)
         t_actual = self.buffer_tickets[-1]
         fecha_corte = t_actual["fecha_dt"] - timedelta(hours=self.ventana_horas)
 
@@ -130,7 +131,14 @@ class DetectorIncidentesNoSupervisado:
             miembros_idx = np.where(etiquetas == cluster_nuevo)[0]
             tamano_cluster = len(miembros_idx)
 
-            if tamano_cluster >= self.min_muestras_masivo:
+            # Criterio ITIL e Ingeniería de Servicios:
+            # 1. Debe alcanzar el umbral de muestras mínimas concurrentes (>= 3)
+            # 2. Solo aplica a fallas de servicio (tipo == 'falla'). Las dudas/consultas/trámites
+            #    son solicitudes de servicio informativas y NUNCA constituyen un incidente masivo.
+            es_falla = (tipo == "falla")
+            fallas_en_cluster = sum(1 for i in miembros_idx if tickets_ventana[i].get("tipo") == "falla")
+
+            if tamano_cluster >= self.min_muestras_masivo and es_falla and fallas_en_cluster >= self.min_muestras_masivo:
                 es_incidente_masivo = True
                 id_incidente_masivo = f"INC_MASIVO_{tickets_ventana[miembros_idx[0]]['id']}"
 
@@ -140,10 +148,10 @@ class DetectorIncidentesNoSupervisado:
                 top_palabras = [str(vocab[i]) for i in top_indices if centroide[i] > 0]
 
                 alerta = (
-                    f"¡ALERTA DE INCIDENTE MASIVO DETECTADO NO SUPERVISADO! "
-                    f"Se han agrupado {tamano_cluster} tickets similares en la última ventana temporal. "
+                    f"ALERTA DE INCIDENTE MASIVO DETECTADO (DBSCAN): "
+                    f"Se han agrupado {tamano_cluster} reportes concurrentes de falla en la última ventana temporal. "
                     f"Términos característicos del brote: {', '.join(top_palabras)}. "
-                    f"Vinculados al incidente padre {id_incidente_masivo}."
+                    f"Vinculados al incidente maestro {id_incidente_masivo}."
                 )
 
         return ResultadoClustering(

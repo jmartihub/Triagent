@@ -48,17 +48,21 @@ class OntologiaTI:
         texto = f"{asunto} {descripcion}".lower()
         if "teams" in texto:
             return "teams"
-        if "wifi" in texto or "wi-fi" in texto or "red" in texto:
+        if any(w in texto for w in ["wifi", "wi-fi", "red", "internet", "conexion", "switch"]):
             return "red_wifi"
-        if "banner" in texto or "materia" in texto or "horario" in texto:
+        if any(w in texto for w in ["banner", "materia", "horario", "moodle", "aula virtual", "campus virtual", "nota"]):
             return "banner"
-        if "correo" in texto or "buzon" in texto:
+        if any(w in texto for w in ["correo", "buzon", "office", "office 365", "m365", "outlook", "word", "excel", "onedrive"]):
             return "correo"
-        if "pago" in texto or "pse" in texto or "recibo" in texto:
+        if any(w in texto for w in ["pago", "pse", "recibo", "tarjeta", "banco", "factura", "liquidacion", "descuento", "matricula financiera"]):
             return "pagos_linea"
-        if "sala" in texto or "computador" in texto or "laboratorio" in texto:
+        if any(w in texto for w in ["vdi", "sala virtual", "remoto", "escritorio remoto"]):
+            return "sala_virtual"
+        if any(w in texto for w in ["autocad", "spss", "matlab", "licencia", "software"]):
+            return "software_salas"
+        if any(w in texto for w in ["sala", "computador", "laboratorio", "pantalla", "teclado", "mouse", "impresora"]):
             return "computadores_fisicos"
-        if "clave" in texto or "contraseña" in texto or "usuario" in texto:
+        if any(w in texto for w in ["clave", "contraseña", "usuario", "autenticador", "acceso", "login", "cuenta"]):
             return "accesos_cuentas"
 
         return "accesos_cuentas"

@@ -32,44 +32,44 @@ def imprimir_encabezado(titulo: str):
 
 
 def mostrar_paso(paso: str, descripcion: str):
-    print(f"\n▶ [{paso.upper()}] {descripcion}")
+    print(f"\n[{paso.upper()}] {descripcion}")
     time.sleep(0.3)
 
 
 def renderizar_decision(decision: DecisionAgente, ticket: dict):
     print("\n" + "─" * 80)
-    print("📋 RESUMEN DE LA ACCIÓN VERIFICABLE DEL AGENTE")
+    print("[RESUMEN DE LA ACCION VERIFICABLE DEL AGENTE]")
     print("─" * 80)
     print(f"• ID Ticket:              #{decision.id_ticket}")
     print(f"• Formulario Original:    {ticket.get('formulario_elegido')}")
     print(f"• Formulario Definitivo:  {decision.formulario_final}" +
-          (" ⚠️ [CORREGIDO POR EL AGENTE]" if decision.hubo_cambio_formulario else " [OK]"))
+          (" [CORREGIDO POR EL AGENTE]" if decision.hubo_cambio_formulario else " [OK]"))
     print(f"• Urgencia Final:         {decision.urgencia_final}")
     print(f"• Red de Seguridad FOL:   " +
-          ("🚨 ACTIVADA (FOL corrigió subestimación de ML)" if decision.seguridad_ml_activada else "Inferencia estándar"))
+          ("ACTIVADA (FOL corrigio subestimacion de ML)" if decision.seguridad_ml_activada else "Inferencia estandar"))
     print(f"• Grupo Asignado:         {decision.grupo_asignado}")
-    print(f"• Técnico Especialista:   {decision.tecnico_asignado} ({decision.tecnico_correo})")
-    print(f"• Tiempo Máx SLA:         {decision.tiempo_sla_horas} horas")
+    print(f"• Tecnico Especialista:   {decision.tecnico_asignado} ({decision.tecnico_correo})")
+    print(f"• Tiempo Max SLA:         {decision.tiempo_sla_horas} horas")
     print(f"• Tiempo Estimado Cola:   {decision.horas_estimadas_resolucion} horas (Riesgo: {decision.nivel_riesgo_sla})")
 
     if decision.es_incidente_masivo:
-        print(f"• 📢 Incidente Masivo:    ASOCIADO AL INCIDENTE MAESTRO {decision.id_incidente_masivo}")
+        print(f"• [INCIDENTE MASIVO]      ASOCIADO AL INCIDENTE MAESTRO {decision.id_incidente_masivo}")
     if decision.es_duplicado:
-        print(f"• ℹ️ Duplicado Detectado: Vinculado al ticket #{decision.ticket_original_id}")
+        print(f"• [DUPLICADO DETECTADO]   Vinculado al ticket #{decision.ticket_original_id}")
     if decision.requiere_revision_humana:
-        print(f"• 👤 Human-in-the-loop:   Marcado para confirmación del técnico (baja certeza inicial)")
+        print(f"• [REVISION HUMANA]       Marcado para confirmacion del tecnico (baja certeza inicial)")
 
     print("\n" + "─" * 80)
-    print("🧠 TRAZA FORMAL DE RAZONAMIENTO (LÓGICA DE PRIMER ORDEN & ONTOLOGÍA)")
+    print("[TRAZA FORMAL DE RAZONAMIENTO: LOGICA DE PRIMER ORDEN & ONTOLOGIA]")
     print("─" * 80)
-    print("• Explicación Ontológica:")
+    print("• Explicacion Ontologica:")
     print(f"  {decision.explicacion_ontologica}")
-    print("• Deducciones FOL (Cláusulas aplicadas):")
+    print("• Deducciones FOL (Clausulas aplicadas):")
     for d in decision.justificacion_fol:
         print(f"  - {d}")
 
     print("\n" + "─" * 80)
-    print("💬 RESPUESTA PRELIMINAR GENERADA PARA EL ESTUDIANTE (ACCIÓN 3)")
+    print("[RESPUESTA PRELIMINAR GENERADA PARA EL ESTUDIANTE (ACCION 3)]")
     print("─" * 80)
     print(decision.respuesta_preliminar)
     print("─" * 80)
@@ -128,9 +128,9 @@ def caso_incidente_masivo(agente: AgenteTriaje):
         print(f"\n→ Ingresando ticket {i}/3: #{t['id']} ('{t['asunto']}')")
         dec = agente.procesar_ticket(t)
         if dec.es_incidente_masivo:
-            print(f"  🚨 ALERTA: DBSCAN agrupó {t['id']} en el incidente masivo '{dec.id_incidente_masivo}'!")
+            print(f"  [ALERTA DBSCAN] Agrupado {t['id']} en el incidente masivo '{dec.id_incidente_masivo}'!")
         else:
-            print(f"  ✓ Procesado individualmente como {dec.urgencia_final}")
+            print(f"  [OK] Procesado individualmente como {dec.urgencia_final}")
 
     renderizar_decision(dec, tickets_brote[-1])
 

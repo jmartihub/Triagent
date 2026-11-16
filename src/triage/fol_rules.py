@@ -56,6 +56,16 @@ class MotorInferenciaFOL:
     def _construir_reglas(self) -> List[ReglaFOL]:
         t = "?t"
         return [
+            # R0: Incidente ya resuelto o aviso informativo -> Baja
+            ReglaFOL(
+                id_regla="FOL-R00",
+                nombre="Incidente Resuelto o Informativo",
+                premisas=[
+                    Predicado("YaResuelto", (t,)),
+                ],
+                conclusion=Predicado("Urgencia", (t, "Baja")),
+                explicacion_formal="∀t (YaResuelto(t) → Urgencia(t, Baja))",
+            ),
             # R1: Impacto Masivo/Grupo con Bloqueo -> Crítica + Escalamiento
             ReglaFOL(
                 id_regla="FOL-R01",
@@ -168,6 +178,40 @@ class MotorInferenciaFOL:
                     "PlazoCercano(t) ∧ Alternativa(t) → Urgencia(t, Media))"
                 ),
             ),
+            # R8B: Falla individual bloqueante sin plazo explícito pero sin alternativa -> Alta
+            ReglaFOL(
+                id_regla="FOL-R08B",
+                nombre="Bloqueo Individual Total Sin Alternativa",
+                premisas=[
+                    Predicado("EsFalla", (t,)),
+                    Predicado("AlcanceIndividual", (t,)),
+                    Predicado("Bloquea", (t,)),
+                    Predicado("SinAlternativa", (t,)),
+                    Predicado("SinPlazo", (t,)),
+                ],
+                conclusion=Predicado("Urgencia", (t, "Alta")),
+                explicacion_formal=(
+                    "∀t (EsFalla(t) ∧ AlcanceIndividual(t) ∧ Bloquea(t) ∧ "
+                    "¬Alternativa(t) ∧ SinPlazo(t) → Urgencia(t, Alta))"
+                ),
+            ),
+            # R8C: Falla individual bloqueante sin plazo explícito con alternativa mitigante -> Media
+            ReglaFOL(
+                id_regla="FOL-R08C",
+                nombre="Bloqueo Individual Mitigado Sin Plazo",
+                premisas=[
+                    Predicado("EsFalla", (t,)),
+                    Predicado("AlcanceIndividual", (t,)),
+                    Predicado("Bloquea", (t,)),
+                    Predicado("TieneAlternativa", (t,)),
+                    Predicado("SinPlazo", (t,)),
+                ],
+                conclusion=Predicado("Urgencia", (t, "Media")),
+                explicacion_formal=(
+                    "∀t (EsFalla(t) ∧ AlcanceIndividual(t) ∧ Bloquea(t) ∧ "
+                    "Alternativa(t) ∧ SinPlazo(t) → Urgencia(t, Media))"
+                ),
+            ),
             # R9: Falla individual no bloqueante con plazo -> Media
             ReglaFOL(
                 id_regla="FOL-R09",
@@ -213,10 +257,15 @@ class MotorInferenciaFOL:
         plazo: str,
         alternativa: bool,
         confianza_ml: float = 1.0,
+        ya_resuelto: bool = False,
     ) -> Set[Predicado]:
         """Convierte los atributos percibidos en proposiciones de primer orden instanciadas."""
         t = id_ticket
         hechos: Set[Predicado] = set()
+
+        # Resuelto o informativo
+        if ya_resuelto:
+            hechos.add(Predicado("YaResuelto", (t,)))
 
         # Tipo
         if tipo == "duda":
@@ -231,16 +280,16 @@ class MotorInferenciaFOL:
             hechos.add(Predicado("AlcanceIndividual", (t,)))
 
         # Bloqueo
-        if bloquea:
+        if bloquea and not ya_resuelto:
             hechos.add(Predicado("Bloquea", (t,)))
         else:
             hechos.add(Predicado("NoBloquea", (t,)))
 
         # Plazo
-        if plazo == "inmediato":
+        if plazo == "inmediato" and not ya_resuelto:
             hechos.add(Predicado("PlazoInmediato", (t,)))
             hechos.add(Predicado("TienePlazo", (t,)))
-        elif plazo == "cercano":
+        elif plazo == "cercano" and not ya_resuelto:
             hechos.add(Predicado("PlazoCercano", (t,)))
             hechos.add(Predicado("TienePlazo", (t,)))
         else:
@@ -268,11 +317,12 @@ class MotorInferenciaFOL:
         alternativa: bool,
         urgencia_predicha_ml: Optional[str] = None,
         confianza_ml: float = 1.0,
+        ya_resuelto: bool = False,
     ) -> DeduccionFOL:
         """Aplica encadenamiento hacia adelante sobre los hechos del ticket."""
         t = id_ticket
         base_hechos = self.instanciar_hechos(
-            t, tipo, alcance, bloquea, plazo, alternativa, confianza_ml
+            t, tipo, alcance, bloquea, plazo, alternativa, confianza_ml, ya_resuelto
         )
 
         reglas_disparadas: List[str] = []
@@ -328,11 +378,11 @@ class MotorInferenciaFOL:
                             escalamiento = True
 
         # Red de seguridad 2: Auditoría contra predicción de ML
-        # Si ML subestima una situación que en lógica es Crítica (riesgo mayor para el SLA)
-        if urgencia_predicha_ml and not seguridad_activada:
+        # Si ML subestima una situación que en lógica es de mayor urgencia (riesgo para SLA)
+        if urgencia_predicha_ml:
             niveles = ["Baja", "Media", "Alta", "Crítica"]
-            idx_ml = niveles.index(urgencia_predicha_ml)
-            idx_fol = niveles.index(urgencia_deducida)
+            idx_ml = niveles.index(urgencia_predicha_ml) if urgencia_predicha_ml in niveles else 1
+            idx_fol = niveles.index(urgencia_deducida) if urgencia_deducida in niveles else 1
 
             if idx_fol > idx_ml:
                 seguridad_activada = True

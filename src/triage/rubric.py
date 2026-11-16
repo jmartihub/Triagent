@@ -38,7 +38,8 @@ def urgencia(f: Factores) -> str:
             return "Alta" if f.alternativa else "Crítica"
         if f.plazo == "cercano":
             return "Media" if f.alternativa else "Alta"
-        return "Media"
+        # Sin plazo explícito: si no tiene alternativa, es Alta; si tiene alternativa mitigante, es Media.
+        return "Alta" if not f.alternativa else "Media"
     return "Media" if f.plazo != "ninguno" else "Baja"
 
 

@@ -131,13 +131,91 @@ HTML_INDEX = """<!DOCTYPE html>
   <title>Mesa de Ayuda TI - Agente de Triaje y Priorización</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    :root {
+      color-scheme: dark;
+      font-size: 17px;
+      --scroll-track: #0f172a;
+      --scroll-thumb: #475569;
+    }
+
+    html { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--scroll-track); }
+    body { font-size: 17px; }
+    .text-xs { font-size: 0.875rem !important; line-height: 1.25rem; }
+    .text-\\[10px\\] { font-size: 0.75rem !important; line-height: 1rem; }
+    .text-\\[11px\\] { font-size: 0.8125rem !important; line-height: 1.125rem; }
+
+    * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--scroll-track); }
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-track { background: var(--scroll-track); border-radius: 9999px; }
+    *::-webkit-scrollbar-thumb {
+      background: var(--scroll-thumb);
+      border: 2px solid var(--scroll-track);
+      border-radius: 9999px;
+    }
+    *::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
     .badge-critica { background: #450a0a; color: #fca5a5; border: 1px solid #991b1b; }
     .badge-alta { background: #431407; color: #fdba74; border: 1px solid #9a3412; }
     .badge-media { background: #172554; color: #93c5fd; border: 1px solid #1e40af; }
     .badge-baja { background: #064e3b; color: #86efac; border: 1px solid #166534; }
+
+    body.theme-light {
+      color-scheme: light;
+      background: #f1f5f9 !important;
+      color: #0f172a !important;
+      --scroll-track: #e2e8f0;
+      --scroll-thumb: #94a3b8;
+    }
+    .theme-light .bg-slate-950 { background-color: #ffffff !important; }
+    .theme-light .bg-slate-900 { background-color: #f8fafc !important; }
+    .theme-light .bg-slate-800 { background-color: #e2e8f0 !important; }
+    .theme-light .text-white { color: #0f172a !important; }
+    .theme-light .text-slate-100 { color: #0f172a !important; }
+    .theme-light .text-slate-200 { color: #1e293b !important; }
+    .theme-light .text-slate-300 { color: #334155 !important; }
+    .theme-light .text-slate-400 { color: #475569 !important; }
+    .theme-light .text-slate-500 { color: #64748b !important; }
+    .theme-light .border-slate-800,
+    .theme-light .border-slate-700 { border-color: #cbd5e1 !important; }
+    .theme-light .hover\\:bg-slate-700:hover,
+    .theme-light .hover\\:bg-slate-950:hover { background-color: #e2e8f0 !important; }
+    .theme-light .text-rose-400 { color: #be123c !important; }
+    .theme-light .text-amber-400 { color: #b45309 !important; }
+    .theme-light .text-blue-400 { color: #1d4ed8 !important; }
+    .theme-light .text-emerald-400 { color: #047857 !important; }
+    .theme-light [class*="text-rose-400/"] { color: #9f1239 !important; }
+    .theme-light [class*="text-amber-400/"] { color: #92400e !important; }
+    .theme-light [class*="text-blue-400/"] { color: #1e40af !important; }
+    .theme-light [class*="text-emerald-400/"] { color: #065f46 !important; }
+    .theme-light [class*="bg-rose-950"] { background-color: #fff1f2 !important; }
+    .theme-light [class*="bg-amber-950"] { background-color: #fffbeb !important; }
+    .theme-light [class*="bg-blue-950"] { background-color: #eff6ff !important; }
+    .theme-light [class*="border-rose-950"],
+    .theme-light [class*="border-rose-800"] { border-color: #fecdd3 !important; }
+    .theme-light [class*="border-amber-950"],
+    .theme-light [class*="border-amber-800"] { border-color: #fde68a !important; }
+    .theme-light [class*="border-blue-800"] { border-color: #bfdbfe !important; }
+    .theme-light .badge-critica { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+    .theme-light .badge-alta { background: #ffedd5; color: #9a3412; border-color: #fdba74; }
+    .theme-light .badge-media { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+    .theme-light .badge-baja { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+
+    @media (max-width: 900px) {
+      .tickets-table { min-width: 0 !important; }
+      .queue-date-cell,
+      .queue-status { white-space: normal !important; overflow-wrap: anywhere; }
+    }
+    @media (max-width: 640px) {
+      .queue-date-column { display: none; }
+      .tickets-table th:nth-child(1) { width: 10%; }
+      .tickets-table th:nth-child(2) { width: 40%; }
+      .tickets-table th:nth-child(4) { width: 20%; }
+      .tickets-table th:nth-child(5) { width: 12%; }
+      .tickets-table th:nth-child(6) { width: 18%; }
+    }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-200 min-h-screen font-sans">
+<body class="theme-dark bg-slate-950 text-slate-200 min-h-screen font-sans">
   <div class="max-w-7xl mx-auto px-4 py-6">
     <!-- Encabezado Institucional -->
     <header class="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-800 pb-5 mb-6">
@@ -150,6 +228,9 @@ HTML_INDEX = """<!DOCTYPE html>
         </p>
       </div>
       <div class="flex items-center gap-3 mt-4 md:mt-0">
+        <button id="btn-theme" type="button" onclick="cambiarTema()" aria-pressed="false" aria-label="Cambiar a modo claro" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded border border-slate-700 transition">
+          Modo claro
+        </button>
         <span id="glpi-status" class="px-2.5 py-1 text-xs rounded bg-slate-900 text-slate-400 border border-slate-800 font-mono">
           GLPI: Consultando...
         </span>
@@ -374,13 +455,14 @@ HTML_INDEX = """<!DOCTYPE html>
 
     <!-- PESTANA 2: MONITOR DE COLA GLPI -->
     <section id="sec-cola" class="hidden bg-slate-900 p-5 rounded-lg border border-slate-800">
-      <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+      <div class="mb-4 border-b border-slate-800 pb-3">
         <div>
           <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Tickets Recientes Registrados en GLPI</h2>
           <p class="text-xs text-slate-400">Hasta 1.000 solicitudes, con estado y urgencia actuales</p>
         </div>
+      </div>
       <!-- Filtros Rapidos y Buscador -->
-      <div class="flex flex-col sm:flex-row gap-2 items-center justify-between mb-3 text-xs">
+      <div class="flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between mb-4 text-xs">
         <div class="flex gap-1.5 flex-wrap">
           <button onclick="filtrarTickets('todos')" id="filtro-todos" class="filter-btn px-2.5 py-1 rounded bg-slate-800 text-white border border-slate-700 font-medium">Todos</button>
           <button onclick="filtrarTickets('Crítica')" id="filtro-critica" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">Crítica</button>
@@ -395,20 +477,20 @@ HTML_INDEX = """<!DOCTYPE html>
         </div>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs text-slate-300">
+      <div class="overflow-x-auto rounded border border-slate-800">
+        <table class="tickets-table w-full min-w-[900px] table-fixed text-left text-xs text-slate-300">
           <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
             <tr>
-              <th class="p-2.5">ID</th>
-              <th class="p-2.5">Asunto</th>
-              <th class="p-2.5">Fecha</th>
-              <th class="p-2.5">Estado</th>
-              <th class="p-2.5">Urgencia</th>
-              <th class="p-2.5">Retroalimentación Humana</th>
+              <th class="w-[8%] px-3 py-2.5">ID</th>
+              <th class="w-[29%] px-3 py-2.5">Asunto</th>
+              <th class="queue-date-column w-[17%] px-3 py-2.5">Fecha</th>
+              <th class="w-[16%] px-3 py-2.5">Estado</th>
+              <th class="w-[12%] px-3 py-2.5">Urgencia</th>
+              <th class="w-[18%] px-3 py-2.5">Feedback</th>
             </tr>
           </thead>
           <tbody id="tabla-tickets" class="divide-y divide-slate-800">
-            <tr><td colspan="6" class="p-4 text-center text-slate-500">Cargando tickets...</td></tr>
+            <tr><td colspan="6" class="px-3 py-4 text-center text-slate-500">Cargando tickets...</td></tr>
           </tbody>
         </table>
       </div>
@@ -435,7 +517,7 @@ HTML_INDEX = """<!DOCTYPE html>
     };
     const ESTADOS = {
       1: 'Nuevo',
-      2: 'En curso / Asignado',
+      2: 'En curso',
       3: 'Planificado',
       4: 'En espera',
       5: 'Resuelto',
@@ -443,6 +525,21 @@ HTML_INDEX = """<!DOCTYPE html>
     };
     let ticketsCargados = [];
     let filtroActual = 'todos';
+
+    function aplicarTema(tema) {
+      const claro = tema === 'light';
+      document.body.classList.toggle('theme-light', claro);
+      document.body.classList.toggle('theme-dark', !claro);
+      const boton = document.getElementById('btn-theme');
+      boton.innerText = claro ? 'Modo oscuro' : 'Modo claro';
+      boton.setAttribute('aria-pressed', String(claro));
+      boton.setAttribute('aria-label', claro ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
+      localStorage.setItem('triagent-theme', claro ? 'light' : 'dark');
+    }
+
+    function cambiarTema() {
+      aplicarTema(document.body.classList.contains('theme-light') ? 'dark' : 'light');
+    }
 
     function escaparHTML(valor) {
       return String(valor ?? '').replace(/[&<>"']/g, caracter => ({
@@ -652,16 +749,16 @@ HTML_INDEX = """<!DOCTYPE html>
         const estadoNombre = ESTADOS[estado] || 'Desconocido';
         const id = Number.parseInt(ticket.id, 10);
         const botonFeedback = Number.isSafeInteger(id)
-          ? `<button onclick="corregirHumano(${id})" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded border border-slate-700 transition">Corregir (Feedback)</button>`
+          ? `<button onclick="corregirHumano(${id})" title="Corregir la urgencia" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded border border-slate-700 transition whitespace-nowrap">Corregir</button>`
           : '<span class="text-slate-500">No disponible</span>';
         return `
           <tr class="hover:bg-slate-950">
-            <td class="p-2.5 font-mono text-slate-400">#${escaparHTML(ticket.id)}</td>
-            <td class="p-2.5 font-medium text-slate-200">${escaparHTML(ticket.name || ticket.content || '(Sin asunto)')}</td>
-            <td class="p-2.5 text-slate-400 font-mono">${escaparHTML(ticket.date || '-')}</td>
-            <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">${estadoNombre}</span></td>
-            <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-semibold ${NIVELES_COLOR[urgencia] || 'bg-slate-800 text-slate-400'}">${urgencia}</span></td>
-            <td class="p-2.5">${botonFeedback}</td>
+            <td class="px-3 py-2.5 font-mono text-slate-400">${escaparHTML(`#${ticket.id}`)}</td>
+            <td class="px-3 py-2.5 font-medium text-slate-200 truncate" title="${escaparHTML(ticket.name || ticket.content || '(Sin asunto)')}">${escaparHTML(ticket.name || ticket.content || '(Sin asunto)')}</td>
+            <td class="queue-date-column queue-date-cell px-3 py-2.5 text-slate-400 font-mono">${escaparHTML(ticket.date || '-')}</td>
+            <td class="px-3 py-2.5"><span class="queue-status px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">${estadoNombre}</span></td>
+            <td class="px-3 py-2.5"><span class="px-1 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${NIVELES_COLOR[urgencia] || 'bg-slate-800 text-slate-400'}">${urgencia}</span></td>
+            <td class="px-3 py-2.5">${botonFeedback}</td>
           </tr>
         `;
       }).join('');
@@ -726,6 +823,7 @@ HTML_INDEX = """<!DOCTYPE html>
       }
     }
 
+    aplicarTema(localStorage.getItem('triagent-theme') || 'dark');
     cargarMetricasYCola();
   </script>
 </body>

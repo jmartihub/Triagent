@@ -26,7 +26,7 @@ class Factores:
 def urgencia(f: Factores) -> str:
     # R1. Afecta a muchas personas o a un servicio institucional.
     if f.alcance in ("grupo", "institucional"):
-        return "Crítica" if f.bloquea else "Alta"
+        return "Crítica" if f.bloquea and not f.alternativa else "Alta"
 
     # R2. Dudas y consultas: solo suben a Media si hay plazo.
     if f.tipo == "duda":

@@ -29,10 +29,15 @@ python main.py all
 python tests/test_rubric.py
 python tests/test_reasoning.py
 python tests/test_agent_full.py
+python tests/test_clustering_cases.py
 python tests/test_dashboard.py
+python tests/test_priority_cases.py
 ```
 
 El resumen del dashboard se calcula con los últimos 1.000 tickets consultados. El cumplimiento de SLA se muestra solo cuando GLPI entrega tanto la fecha límite como la fecha de resolución; si esos datos no existen, se indica como no disponible.
+El panel permite cambiar entre modo claro y oscuro, conserva la preferencia del navegador y adapta la cola a pantallas pequeñas.
+
+La prioridad ya no interpreta por sí sola una falla como bloqueo: usa señales explícitas de interrupción, reconoce consultas y distingue una fecha futura de una actividad en curso. Una falla grupal bloqueante con alternativa temporal se clasifica como Alta; sin alternativa, como Crítica. `tests/test_priority_cases.py` valida las reglas contra las 24 muestras de `data/gold_manual.csv` (con fechas separadas para aislar los casos del detector de incidentes); es una prueba de ese conjunto, no una garantía de precisión sobre tickets reales.
 
 Otros comandos individuales:
 - `python main.py deep`: Entrena y evalúa la variante de Deep Learning (Red Neuronal Multicapa MLP).

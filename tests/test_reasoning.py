@@ -56,6 +56,35 @@ def test_fol_inference():
     assert "FOL-R01" in res.reglas_disparadas
     assert "FOL-ESC01" in res.reglas_disparadas
 
+    # Una alternativa temporal reduce el impacto de una falla grupal bloqueante.
+    res_mitigada = motor.razonar(
+        id_ticket="tk_001b",
+        tipo="falla",
+        alcance="grupo",
+        bloquea=True,
+        plazo="ninguno",
+        alternativa=True,
+        urgencia_predicha_ml="Crítica",
+        confianza_ml=0.90,
+    )
+    assert res_mitigada.urgencia_deducida == "Alta"
+    assert res_mitigada.escalamiento_inmediato is False
+    assert "FOL-R01B" in res_mitigada.reglas_disparadas
+
+    resuelto = motor.razonar(
+        id_ticket="tk_resuelto",
+        tipo="falla",
+        alcance="institucional",
+        bloquea=True,
+        plazo="inmediato",
+        alternativa=False,
+        urgencia_predicha_ml="Crítica",
+        confianza_ml=0.90,
+        ya_resuelto=True,
+    )
+    assert resuelto.urgencia_deducida == "Baja"
+    assert resuelto.escalamiento_inmediato is False
+
     # Caso 2: Confianza ML baja (< umbral) -> activa revisión humana
     res_baja = motor.razonar(
         id_ticket="tk_002",

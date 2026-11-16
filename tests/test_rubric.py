@@ -11,6 +11,8 @@ def test_ejemplos_de_la_rubrica():
     assert urgencia(Factores("falla", "individual", True, "inmediato", False)) == "Crítica"
     # Crítica: afecta a un grupo y bloquea.
     assert urgencia(Factores("falla", "grupo", True, "ninguno", False)) == "Crítica"
+    # Alta: afecta a un grupo, pero existe una alternativa temporal.
+    assert urgencia(Factores("falla", "grupo", True, "ninguno", True)) == "Alta"
     # Alta: bloquea a una persona con plazo cercano y sin alternativa.
     assert urgencia(Factores("falla", "individual", True, "cercano", False)) == "Alta"
     # Media: bloquea pero hay alternativa y plazo cercano.

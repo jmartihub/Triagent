@@ -230,17 +230,26 @@ class AgenteTriaje:
             "procedimiento", "proceso", "requisitos", "informacion sobre", "solicito saber",
             "como puedo", "donde puedo", "que debo hacer", "solicitud de", "inquietud",
             "como descargar", "como instalar", "como pagar", "como ingresar por primera vez",
-            "instrucciones", "tutorial", "guia"
+            "instrucciones", "tutorial", "guia", "se puede", "no se si",
+            "solo quiero confirmar", "quiero confirmar", "me gustaria saber",
+            "es posible", "cuantos", "cuantas", "hasta que hora"
         ]
         terminos_falla = [
             "error", "fallo", "falla", "no funciona", "caido", "bloqueado", "denegado",
             "no tengo acceso", "no abre", "se congela", "pantalla negra", "pantallazo",
             "se cierra", "no me deja", "no puedo ingresar", "no conecta", "sin internet",
-            "sin conexion", "dañado", "interrupcion", "lentitud extrema"
+            "sin conexion", "dañado", "interrupcion", "lentitud extrema", "no se puede",
+            "no puedo pagar", "no puedo enviar", "no puedo usar",
+            "no puedo hacer", "no enciende", "no encienden", "no hay wifi",
+            "sin wifi", "no hay internet", "restablecimiento no me llega",
+            "nadie de mi programa puede entrar", "nadie puede entrar",
+            "nadie puede conectarse"
         ]
+        hay_senal_de_consulta = any(w in texto_b for w in terminos_duda) or "?" in f"{asunto} {descripcion}"
+        hay_senal_de_falla = any(w in texto_b for w in terminos_falla)
         if ya_resuelto:
             tipo = "duda"
-        elif any(w in texto_b for w in terminos_duda) and not any(w in texto_b for w in terminos_falla):
+        elif hay_senal_de_consulta and not hay_senal_de_falla:
             tipo = "duda"
         else:
             tipo = "falla"
@@ -250,13 +259,15 @@ class AgenteTriaje:
             "toda la universidad", "todo el campus", "a todos los estudiantes",
             "nadie en la universidad", "todo el edificio", "en toda la sede",
             "caida masiva", "caida general", "a nivel general", "servidor caido",
-            "a nadie le funciona"
+            "a nadie le funciona", "nadie de mi programa", "nadie del programa",
+            "a todo mi programa", "todos los estudiantes de mi programa",
+            "nadie puede entrar", "nadie puede conectarse"
         ]):
             alcance = "institucional"
         elif any(w in texto_b for w in [
             "todo el salon", "mi grupo", "varios companeros", "a todos nos sale",
             "en mi clase", "en la sala", "en el laboratorio", "a varios",
-            "a todo el curso", "en el bloque", "todo el piso"
+            "a todo el curso", "en el bloque", "todo el piso", "varios estamos afectados"
         ]):
             alcance = "grupo"
         else:
@@ -267,14 +278,26 @@ class AgenteTriaje:
             "puedo seguir trabajando", "no es grave", "solo queria reportarlo",
             "no me impide", "ya todo esta bien", "ya esta bien", "ya funciona",
             "ya pude", "duro 5 minutos", "era solo una actualizacion", "solo es una duda",
-            "solo quiero saber", "es informativo", "funciona pero", "solo queria preguntar"
+            "solo quiero saber", "es informativo", "funciona pero", "solo queria preguntar",
+            "puedo seguir conectado", "puedo trabajar", "igual puedo trabajar",
+            "igual puedo", "a veces", "por momentos", "solo lo reporto",
+            "no tengo afan", "cruce de horarios"
         ]
         terminos_bloqueo = [
             "no tengo acceso", "bloqueado", "acceso denegado", "no me deja entrar",
             "no puedo ingresar", "completamente bloqueado", "no puedo continuar",
             "no deja hacer nada", "imposible acceder", "no puedo presentar",
             "no me deja pagar", "no puedo enviar", "no puedo matricular", "cuenta suspendida",
-            "no carga el examen", "no abre el examen", "se queda en blanco", "clave incorrecta"
+            "no carga el examen", "no abre el examen", "se queda en blanco", "clave incorrecta",
+            "no me deja", "no abre", "no carga", "no inicia", "no funciona", "no responde",
+            "no conecta", "no me deja usar", "no puedo usar", "no puedo conectarme",
+            "no me deja conectarme", "no hay wifi", "sin wifi",
+            "no hay internet", "nadie puede conectarse", "se cerro el programa",
+            "nadie de mi programa puede entrar",
+            "no me aparece abierta la inscripcion", "error al pagar", "no puedo pagar",
+            "no se puede ingresar", "no se puede conectar", "error al unir",
+            "restablecimiento no me llega", "no puedo hacer mis actividades",
+            "no encienden", "no enciende"
         ]
         if ya_resuelto or any(w in texto_b for w in no_bloquea_frases):
             bloquea = False
@@ -282,23 +305,30 @@ class AgenteTriaje:
             if any(w in texto_b for w in terminos_bloqueo):
                 bloquea = True
             else:
-                bloquea = (tipo == "falla")
+                bloquea = False
 
         # Plazo: evitar falsos positivos con adverbios "ya" en frases como "ya está bien"
         if ya_resuelto:
             plazo = "ninguno"
         elif any(w in texto_b for w in [
-            "parcial", "examen", "en una hora", "15 minutos", "hoy vence",
-            "empieza ya", "es ya", "sustentacion", "entrega hoy", "en media hora",
+            "en una hora", "en 15 minutos", "hoy vence", "vence hoy",
+            "empieza ya", "es ya", "entrega hoy", "en media hora",
             "en 30 minutos", "en 10 minutos", "en 20 minutos", "tengo clase ya",
             "clase en una hora", "en este momento", "plazo maximo hoy", "cierra en minutos",
-            "cierra hoy", "presento en", "vence en"
+            "cierra hoy", "ultimo dia", "ahora mismo", "presento ahora",
+            "vence en una hora", "vence en 30 minutos", "vence en 15 minutos",
+            "vence en 10 minutos",
+            "en medio de un parcial", "en medio de un examen", "examen en curso",
+            "parcial en curso", "evaluacion en curso", "sustentacion en curso",
+            "parcial ahora", "examen ahora", "empieza en este momento"
         ]):
             plazo = "inmediato"
         elif any(w in texto_b for w in [
             "manana", "viernes", "proxima semana", "pocos dias", "este fin de semana",
             "fecha limite", "esta noche", "en 24 horas", "en 48 horas", "en dos dias",
-            "limite de entrega"
+            "limite de entrega", "en tres dias", "en 3 dias", "en cuatro dias",
+            "en 4 dias", "en cinco dias", "en 5 dias", "en 72 horas",
+            "mas adelante", "proximo semestre"
         ]):
             plazo = "cercano"
         else:
@@ -308,7 +338,8 @@ class AgenteTriaje:
         tiene_alt = any(w in texto_b for w in [
             "desde el celular", "otro computador", "otro dispositivo", "amigo",
             "otra sala", "en la app movil", "usando datos", "en otro navegador",
-            "en modo incognito", "desde mi casa"
+            "en modo incognito", "desde mi casa", "otro correo", "ir a tesoreria",
+            "puedo ir a tesoreria", "desde tesoreria", "otra sede", "otro laboratorio"
         ])
         sin_alt = any(w in texto_b for w in [
             "no tengo otra forma", "no tengo otra manera", "sin alternativa",
@@ -376,6 +407,7 @@ class AgenteTriaje:
             cambio_formulario = True
 
         # D. Razonamiento Ontológico: Enrutamiento técnico y SLA
+        urgencia_asignada = urgencia_final
         asignacion_ont = self.ontologia.enrutar_ticket(
             formulario=formulario_final,
             apoyo=apoyo,
@@ -388,15 +420,31 @@ class AgenteTriaje:
         # E. Aprendizaje No Supervisado: Detección de Duplicados e Incidentes Masivos
         clustering_res = self.clustering.analizar_ticket(ticket, tipo=percepciones["tipo"])
         if clustering_res.es_incidente_masivo and percepciones["tipo"] == "falla" and not clustering_res.es_duplicado:
-            urgencia_final = "Crítica"
-            deduccion_fol.trazabilidad_deductiva.append(
-                f"[DBSCAN NO SUPERVISADO] Brote de falla masiva ({clustering_res.tamano_cluster_masivo} reportes concurrentes). "
-                f"Asociado al Incidente Maestro {clustering_res.id_incidente_masivo} y escalado a Crítica."
-            )
+            if percepciones["bloquea"]:
+                urgencia_final = "Crítica"
+                deduccion_fol.trazabilidad_deductiva.append(
+                    f"[DBSCAN NO SUPERVISADO] Brote de falla masiva ({clustering_res.tamano_cluster_masivo} reportes concurrentes). "
+                    f"Asociado al Incidente Maestro {clustering_res.id_incidente_masivo} y escalado a Crítica."
+                )
+            else:
+                deduccion_fol.trazabilidad_deductiva.append(
+                    f"[DBSCAN NO SUPERVISADO] Se detectó un brote de reportes ({clustering_res.tamano_cluster_masivo}), "
+                    "pero el impacto fue clasificado como no bloqueante; se conserva la urgencia evaluada."
+                )
         elif clustering_res.es_duplicado:
             deduccion_fol.trazabilidad_deductiva.append(
                 f"[DUPLICADO DETECTADO] Solicitud recurrente (similitud: {clustering_res.similitud_duplicado:.2f}). "
                 f"Asociado al ticket abierto previo #{clustering_res.ticket_original_id}. Se mantiene urgencia evaluada: {urgencia_final}."
+            )
+
+        if urgencia_final != urgencia_asignada:
+            asignacion_ont = self.ontologia.enrutar_ticket(
+                formulario=formulario_final,
+                apoyo=apoyo,
+                urgencia=urgencia_final,
+                asunto=asunto,
+                descripcion=descripcion,
+                tipo=percepciones["tipo"],
             )
 
         # F. Modelo Estadístico de Regresión: Tiempo y riesgo de SLA

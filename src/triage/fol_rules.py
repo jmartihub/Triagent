@@ -73,9 +73,27 @@ class MotorInferenciaFOL:
                 premisas=[
                     Predicado("AfectaGrupoOInstitucional", (t,)),
                     Predicado("Bloquea", (t,)),
+                    Predicado("SinAlternativa", (t,)),
                 ],
                 conclusion=Predicado("Urgencia", (t, "Crítica")),
-                explicacion_formal="∀t (AfectaGrupoOInstitucional(t) ∧ Bloquea(t) → Urgencia(t, Crítica))",
+                explicacion_formal=(
+                    "∀t (AfectaGrupoOInstitucional(t) ∧ Bloquea(t) ∧ ¬Alternativa(t) "
+                    "→ Urgencia(t, Crítica))"
+                ),
+            ),
+            ReglaFOL(
+                id_regla="FOL-R01B",
+                nombre="Falla Grupal Bloqueante con Mitigación",
+                premisas=[
+                    Predicado("AfectaGrupoOInstitucional", (t,)),
+                    Predicado("Bloquea", (t,)),
+                    Predicado("TieneAlternativa", (t,)),
+                ],
+                conclusion=Predicado("Urgencia", (t, "Alta")),
+                explicacion_formal=(
+                    "∀t (AfectaGrupoOInstitucional(t) ∧ Bloquea(t) ∧ Alternativa(t) "
+                    "→ Urgencia(t, Alta))"
+                ),
             ),
             # R2: Falla Masiva No Bloqueante -> Alta
             ReglaFOL(
@@ -351,6 +369,8 @@ class MotorInferenciaFOL:
         while cambio:
             cambio = False
             for regla in self.reglas:
+                if ya_resuelto and regla.id_regla != "FOL-R00":
+                    continue
                 # Reemplazar la variable ?t por el ID concreto del ticket
                 premisas_instanciadas = [
                     Predicado(p.nombre, tuple(t if a == "?t" else a for a in p.argumentos))

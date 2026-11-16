@@ -59,7 +59,36 @@ def test_brote_fallas_requiere_minimo_tres_reportes():
     print("[OK] Brote de fallas: Requiere al menos 3 reportes concurrentes para declarar alerta masiva")
 
 
+def test_escalamiento_masivo_actualiza_sla_y_asignacion():
+    agente = AgenteTriaje(usar_deep_learning=True)
+    tickets = [
+        ("wifi no conecta", "Mi computador no logra conectarse a la red wifi y no tengo internet."),
+        ("no hay wifi", "No puedo usar internet porque el wifi no conecta en mi dispositivo."),
+        ("internet caido", "La red wifi no funciona en mi equipo y no puedo conectarme."),
+    ]
+
+    decisiones = []
+    for i, (asunto, descripcion) in enumerate(tickets):
+        decisiones.append(agente.procesar_ticket({
+            "id": f"ESCALAMIENTO_{i}",
+            "formulario_elegido": "Fallas Técnicas TIC",
+            "apoyo": "Red / Wi-Fi",
+            "asunto": asunto,
+            "descripcion": descripcion,
+            "fecha_apertura": f"2026-11-15 10:{i * 5:02d}",
+        }))
+
+    ultima = decisiones[-1]
+    sla_critico = agente.ontologia.obtener_politica_sla("Crítica")["tiempo_max_resolucion_horas"]
+    assert ultima.es_incidente_masivo is True
+    assert ultima.urgencia_final == "Crítica"
+    assert ultima.tiempo_sla_horas == sla_critico
+
+    print("[OK] Escalamiento masivo: SLA y enrutamiento reflejan la prioridad final")
+
+
 if __name__ == "__main__":
     test_duda_reiterada_no_es_incidente_masivo()
     test_brote_fallas_requiere_minimo_tres_reportes()
+    test_escalamiento_masivo_actualiza_sla_y_asignacion()
     print("\nTodos los tests de clustering pasaron exitosamente.")

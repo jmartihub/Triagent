@@ -199,12 +199,249 @@ HTML_INDEX = """<!DOCTYPE html>
     .theme-light .badge-media { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
     .theme-light .badge-baja { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
 
+    .app-shell {
+      --surface: #ffffff;
+      --surface-muted: #f7f8fa;
+      --line: #e4e7ec;
+      --ink: #344054;
+      --muted: #667085;
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      min-height: 100vh;
+      background: #f4f5f7;
+    }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      padding: 1.5rem 1rem;
+      background: #fbfbfc;
+      border-right: 1px solid var(--line);
+    }
+    .sidebar-brand { display: flex; align-items: center; gap: 0.75rem; padding: 0 0.5rem; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 0.8rem;
+      background: #e8edf5;
+      color: #52657f;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .sidebar-brand-title { color: #344054; font-size: 1rem; font-weight: 700; }
+    .sidebar-brand-subtitle { color: #87909e; font-size: 0.72rem; margin-top: 0.1rem; }
+    .sidebar-nav-label, .eyebrow {
+      color: #87909e;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .sidebar-nav-label { padding: 0 0.75rem; margin-bottom: 0.6rem; }
+    .sidebar-nav { display: grid; gap: 0.35rem; }
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+      padding: 0.7rem 0.75rem;
+      border: 1px solid transparent;
+      border-radius: 0.65rem;
+      background: transparent;
+      color: #667085;
+      font: inherit;
+      font-size: 0.88rem;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+    }
+    .sidebar-link:hover { background: #f0f2f5; color: #344054; }
+    .sidebar-link.active { background: #e9eef6; border-color: #dce4ef; color: #425675; font-weight: 600; }
+    .nav-index {
+      display: grid;
+      place-items: center;
+      width: 1.55rem;
+      height: 1.55rem;
+      border-radius: 0.45rem;
+      background: #f0f2f5;
+      color: #808a99;
+      font-size: 0.68rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .sidebar-link.active .nav-index { background: #dce5f1; color: #52657f; }
+    .nav-count {
+      margin-left: auto;
+      color: #87909e;
+      font-size: 0.76rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .sidebar-footer {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      margin-top: auto;
+      padding: 0.85rem 0.75rem;
+      border-top: 1px solid var(--line);
+      color: #7a8492;
+      font-size: 0.77rem;
+    }
+    .connection-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #94b9a2; }
+    .workspace { display: flex; flex-direction: column; min-width: 0; height: 100vh; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      min-height: 6rem;
+      padding: 1rem 2rem;
+      background: rgba(255, 255, 255, 0.82);
+      border-bottom: 1px solid var(--line);
+    }
+    .topbar h1 { margin-top: 0.2rem; color: #344054; font-size: 1.3rem; font-weight: 650; letter-spacing: -0.02em; }
+    .topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.65rem; }
+    .workspace-content { min-height: 0; flex: 1; overflow: auto; padding: 1.5rem 2rem 2rem; }
+    .view-section { max-width: 1440px; margin: 0 auto; }
+    .view-section[hidden] { display: none !important; }
+    .summary-view { display: grid; gap: 1rem; }
+    .summary-view > .bg-slate-900 { margin: 0; }
+    .summary-heading { color: #344054; font-size: 1rem; font-weight: 650; }
+    .summary-subheading { color: #7a8492; font-size: 0.82rem; margin-top: 0.25rem; }
+    .summary-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .dashboard-overview-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); gap: 1rem; }
+    .summary-subcard { min-width: 0; padding: 1.1rem 1.2rem; background: #fff; border: 1px solid #e4e7ec; border-radius: 0.75rem; }
+    .subcard-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.8rem; padding-bottom: 0.8rem; border-bottom: 1px solid #edf0f3; }
+    .recent-ticket-list { display: grid; }
+    .activity-row { display: flex; align-items: center; gap: 0.8rem; min-width: 0; padding: 0.75rem 0; border-bottom: 1px solid #edf0f3; }
+    .activity-row:last-child { border-bottom: 0; }
+    .activity-id { flex: 0 0 auto; color: #8490a0; font-family: ui-monospace, monospace; font-size: 0.74rem; }
+    .activity-main { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 0.2rem; }
+    .activity-subject { overflow: hidden; color: #344054; font-size: 0.83rem; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+    .activity-meta { color: #818b99; font-size: 0.72rem; }
+    .activity-urgency { flex: 0 0 auto; padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+    .badge-unclassified { background: #f0f2f5; color: #737f8f; }
+    .status-breakdown { display: grid; gap: 1.1rem; padding-top: 1.1rem; }
+    .status-breakdown-row { display: grid; gap: 0.45rem; }
+    .status-breakdown-label { display: flex; justify-content: space-between; color: #687385; font-size: 0.8rem; }
+    .status-breakdown-label strong { color: #3b4656; font-variant-numeric: tabular-nums; font-weight: 650; }
+    .status-track { height: 0.42rem; overflow: hidden; background: #f0f2f5; border-radius: 9999px; }
+    .status-fill { display: block; width: 0; height: 100%; border-radius: inherit; transition: width 180ms ease; }
+    .status-new { background: #a8b8cd; }
+    .status-progress { background: #aec4b3; }
+    .status-waiting { background: #d7c8a9; }
+    .status-done { background: #b8c5d2; }
+    .tickets-panel { display: flex; flex-direction: column; min-height: 0; }
+    .tickets-table-wrap { max-height: calc(100vh - 16rem); overflow: auto; }
+    .theme-light .topbar-actions .bg-slate-800 { background: #f3f4f6; color: #5b6472; border-color: #e1e4e9; }
+    .theme-light .topbar-actions .hover\\:bg-slate-700:hover { background: #e9edf2; }
+    .theme-light .app-shell { background: #f4f5f7; }
+    .theme-dark .app-shell {
+      --surface: #111827;
+      --surface-muted: #1f2937;
+      --line: #334155;
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      background: #0f172a;
+    }
+    .theme-dark .sidebar { background: #111827; border-color: #334155; }
+    .theme-dark .sidebar-brand-title,
+    .theme-dark .topbar h1,
+    .theme-dark .summary-heading { color: #e2e8f0; }
+    .theme-dark .sidebar-brand-subtitle,
+    .theme-dark .sidebar-nav-label,
+    .theme-dark .eyebrow,
+    .theme-dark .summary-subheading { color: #94a3b8; }
+    .theme-dark .brand-mark,
+    .theme-dark .nav-index { background: #1f2937; color: #cbd5e1; }
+    .theme-dark .sidebar-link { color: #cbd5e1; }
+    .theme-dark .sidebar-link:hover { background: #1f2937; color: #f8fafc; }
+    .theme-dark .sidebar-link.active { background: #263449; border-color: #3b4b62; color: #e2e8f0; }
+    .theme-dark .sidebar-link.active .nav-index { background: #34445b; color: #e2e8f0; }
+    .theme-dark .sidebar-footer { border-color: #334155; color: #94a3b8; }
+    .theme-dark .topbar { background: #111827; border-color: #334155; }
+    .theme-dark .topbar-actions .bg-slate-800 { background: #1f2937; color: #cbd5e1; border-color: #475569; }
+    .theme-dark .topbar-actions .hover\\:bg-slate-700:hover { background: #334155; }
+    .theme-dark .connection-dot { background: #86a990; }
+    .theme-dark .summary-subcard { background: #111827; border-color: #334155; }
+    .theme-dark .subcard-heading,
+    .theme-dark .activity-row { border-color: #293548; }
+    .theme-dark .activity-subject { color: #e2e8f0; }
+    .theme-dark .activity-id,
+    .theme-dark .activity-meta,
+    .theme-dark .status-breakdown-label { color: #94a3b8; }
+    .theme-dark .badge-unclassified { background: #293548; color: #aab6c5; }
+    .theme-dark .status-breakdown-label strong { color: #cbd5e1; }
+    .theme-dark .status-track { background: #1f2937; }
+    .theme-dark .status-new { background: #7185a0; }
+    .theme-dark .status-progress { background: #718f7b; }
+    .theme-dark .status-waiting { background: #9f8c68; }
+    .theme-dark .status-done { background: #718396; }
+    .theme-dark .bg-rose-600 { background-color: #9e6d76 !important; }
+    .theme-dark .bg-amber-600 { background-color: #9b835e !important; }
+    .theme-dark .bg-blue-600 { background-color: #6f87a2 !important; }
+    .theme-dark .bg-slate-600 { background-color: #64748b !important; }
+    .theme-dark .badge-critica { background: #43343b; color: #d5aeb4; border-color: #674c55; }
+    .theme-dark .badge-alta { background: #463d31; color: #d5c09d; border-color: #716044; }
+    .theme-dark .badge-media { background: #303e50; color: #b4c4d7; border-color: #4a6078; }
+    .theme-dark .badge-baja { background: #30443a; color: #b4cbb9; border-color: #4d6957; }
+    .theme-dark .text-rose-400 { color: #d5aeb4 !important; }
+    .theme-dark .text-amber-400 { color: #d5c09d !important; }
+    .theme-dark .text-blue-400 { color: #b4c4d7 !important; }
+    .theme-dark .text-emerald-400 { color: #b4cbb9 !important; }
+    .theme-light .bg-blue-700 { background-color: #9fb6cf !important; color: #26384d !important; }
+    .theme-light .hover\\:bg-blue-600:hover { background-color: #8fa9c4 !important; }
+    .theme-light .bg-rose-600 { background-color: #d7a4aa !important; }
+    .theme-light .bg-amber-600 { background-color: #ddc49a !important; }
+    .theme-light .bg-blue-600 { background-color: #a4bad2 !important; }
+    .theme-light .bg-slate-600 { background-color: #b7c0cc !important; }
+    .theme-light .text-rose-400 { color: #a96d76 !important; }
+    .theme-light .text-amber-400 { color: #9a7a47 !important; }
+    .theme-light .text-blue-400 { color: #657f9f !important; }
+    .theme-light .text-emerald-400 { color: #638b72 !important; }
+    .theme-light .border-rose-950 { border-color: #eedbdd !important; }
+    .theme-light .border-amber-950 { border-color: #eee5d5 !important; }
+    .theme-light .border-blue-950 { border-color: #dce5ef !important; }
+    .theme-light .border-emerald-950 { border-color: #dce9df !important; }
+    .theme-light [class*="text-rose-400/"] { color: #ae7a80 !important; }
+    .theme-light [class*="text-amber-400/"] { color: #a38a64 !important; }
+    .theme-light [class*="text-blue-400/"] { color: #7188a4 !important; }
+    .theme-light [class*="text-emerald-400/"] { color: #789681 !important; }
+    .theme-light .bg-rose-950\\/40 { background-color: #f7ecee !important; }
+    .theme-light .bg-amber-950\\/40 { background-color: #f7f2e8 !important; }
+    .theme-light .bg-blue-950\\/40 { background-color: #edf2f7 !important; }
+    .theme-light .border-rose-800\\/80 { border-color: #ead4d7 !important; }
+    .theme-light .border-amber-800\\/80 { border-color: #e9dfc9 !important; }
+    .theme-light .border-blue-800\\/80 { border-color: #d8e2ed !important; }
+
     @media (max-width: 900px) {
+      .app-shell { grid-template-columns: 210px minmax(0, 1fr); }
+      .topbar { padding-right: 1.25rem; padding-left: 1.25rem; }
+      .workspace-content { padding-right: 1.25rem; padding-left: 1.25rem; }
+      .summary-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .dashboard-overview-grid { grid-template-columns: 1fr; }
       .tickets-table { min-width: 0 !important; }
       .queue-date-cell,
       .queue-status { white-space: normal !important; overflow-wrap: anywhere; }
     }
+    @media (max-width: 680px) {
+      .app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+      .sidebar { gap: 0.8rem; padding: 0.8rem; border-right: 0; border-bottom: 1px solid var(--line); }
+      .sidebar-brand { padding: 0 0.25rem; }
+      .sidebar-brand-subtitle, .sidebar-nav-label, .sidebar-footer { display: none; }
+      .sidebar-nav { display: flex; gap: 0.35rem; overflow-x: auto; }
+      .sidebar-link { flex: 0 0 auto; width: auto; padding: 0.55rem 0.65rem; font-size: 0.78rem; }
+      .nav-index { display: none; }
+      .nav-count { margin-left: 0.2rem; }
+      .workspace { height: auto; min-height: 0; }
+      .topbar { align-items: flex-start; min-height: 0; padding: 1rem; }
+      .topbar h1 { font-size: 1.1rem; }
+      .topbar-actions { flex-wrap: wrap; }
+      .workspace-content { overflow: visible; padding: 1rem; }
+    }
     @media (max-width: 640px) {
+      .summary-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .queue-date-column { display: none; }
       .tickets-table th:nth-child(1) { width: 10%; }
       .tickets-table th:nth-child(2) { width: 40%; }
@@ -214,46 +451,74 @@ HTML_INDEX = """<!DOCTYPE html>
     }
   </style>
 </head>
-<body class="theme-dark bg-slate-950 text-slate-200 min-h-screen font-sans">
-  <div class="max-w-7xl mx-auto px-4 py-6">
-    <!-- Encabezado Institucional -->
-    <header class="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-800 pb-5 mb-6">
+<body class="theme-light bg-slate-950 text-slate-200 min-h-screen font-sans">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-mark" aria-hidden="true">TA</span>
+        <div>
+          <div class="sidebar-brand-title">Triagent</div>
+          <div class="sidebar-brand-subtitle">Mesa de ayuda TI</div>
+        </div>
+      </div>
       <div>
-        <h1 class="text-xl font-bold text-slate-100 tracking-tight">
-          Mesa de Ayuda TI · Agente de Triaje y Priorización
-        </h1>
-        <p class="text-xs text-slate-400 mt-1">
-          Integración Tooli / GLPI · Arquitectura Híbrida (Neuro-Simbólica) · Proyecto Final IA
-        </p>
+        <div class="sidebar-nav-label">Espacio de trabajo</div>
+        <nav class="sidebar-nav" aria-label="Navegación principal">
+          <button type="button" id="nav-resumen" class="sidebar-link active" aria-current="page" onclick="cambiarPestana('resumen')">
+            <span class="nav-index">01</span> Resumen
+          </button>
+          <button type="button" id="nav-simulador" class="sidebar-link" onclick="cambiarPestana('simulador')">
+            <span class="nav-index">02</span> Nuevo ticket
+          </button>
+          <button type="button" id="nav-cola" class="sidebar-link" onclick="cambiarPestana('cola')">
+            <span class="nav-index">03</span> Cola GLPI <span id="count-tickets" class="nav-count">0</span>
+          </button>
+          <button type="button" id="nav-ontologia" class="sidebar-link" onclick="cambiarPestana('ontologia')">
+            <span class="nav-index">04</span> Especialistas
+          </button>
+        </nav>
       </div>
-      <div class="flex items-center gap-3 mt-4 md:mt-0">
-        <button id="btn-theme" type="button" onclick="cambiarTema()" aria-pressed="false" aria-label="Cambiar a modo claro" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded border border-slate-700 transition">
-          Modo claro
-        </button>
-        <span id="glpi-status" class="px-2.5 py-1 text-xs rounded bg-slate-900 text-slate-400 border border-slate-800 font-mono">
-          GLPI: Consultando...
-        </span>
-        <a href="http://localhost:8080" target="_blank" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded border border-slate-700 transition">
-          Consola GLPI
-        </a>
+      <div class="sidebar-footer">
+        <span class="connection-dot" aria-hidden="true"></span>
+        <span>Agente de triaje</span>
       </div>
-    </header>
+    </aside>
 
-    <!-- Panel de Resumen Administrativo (KPIs y Metricas) -->
-    <div class="mb-6 bg-slate-900 border border-slate-800 rounded-lg p-4">
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Panel de gestión</p>
+          <h1 id="page-title">Resumen general</h1>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-theme" type="button" onclick="cambiarTema()" aria-pressed="true" aria-label="Cambiar a modo oscuro" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition">
+            Modo oscuro
+          </button>
+          <span id="glpi-status" class="px-2.5 py-1.5 text-xs rounded bg-slate-900 text-slate-400 border border-slate-800 font-mono">
+            GLPI: Consultando...
+          </span>
+          <a href="http://localhost:8080" target="_blank" rel="noreferrer" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition">
+            Abrir GLPI
+          </a>
+        </div>
+      </header>
+
+      <main class="workspace-content">
+        <section id="sec-resumen" class="view-section summary-view">
+          <div class="mb-6 bg-slate-900 border border-slate-800 rounded-lg p-4">
       <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
         <div>
-          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300">
-            Resumen Administrativo · Estado de la Mesa de Ayuda
+          <h2 class="summary-heading">
+            Estado de la mesa de ayuda
           </h2>
-          <p class="text-[11px] text-slate-500">Hasta 1.000 tickets recientes de GLPI; el SLA se calcula solo con fechas disponibles</p>
+          <p class="summary-subheading">Indicadores de hasta 1.000 tickets recientes de GLPI</p>
         </div>
-        <button onclick="cargarMetricasYCola()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1 rounded border border-slate-700 transition">
-          Actualizar Datos
+        <button onclick="cargarMetricasYCola()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition">
+          Actualizar
         </button>
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+      <div class="summary-kpis grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
         <!-- Total -->
         <div class="bg-slate-950 p-3 rounded border border-slate-800">
           <span class="text-[10px] uppercase font-medium text-slate-400 block">Total Tickets</span>
@@ -295,7 +560,7 @@ HTML_INDEX = """<!DOCTYPE html>
       <!-- Barra de distribución visual de urgencias -->
       <div>
         <div class="flex justify-between text-[10px] text-slate-400 mb-1">
-          <span>Distribución por Severidad</span>
+          <span>Distribución por urgencia</span>
           <span id="distribucion-label">Consultando tickets...</span>
         </div>
         <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden flex">
@@ -307,21 +572,53 @@ HTML_INDEX = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- Navegacion por Pestanas -->
-    <div class="flex gap-2 border-b border-slate-800 pb-2 mb-6 text-xs">
-      <button onclick="cambiarPestana('simulador')" id="tab-simulador" class="tab-btn px-4 py-2 font-medium rounded bg-slate-800 text-white border border-slate-700">
-        Simulador de Solicitudes (Tooli)
-      </button>
-      <button onclick="cambiarPestana('cola')" id="tab-cola" class="tab-btn px-4 py-2 font-medium rounded text-slate-400 hover:text-slate-200 border border-transparent">
-        Monitor de Cola GLPI (<span id="count-tickets">0</span>)
-      </button>
-      <button onclick="cambiarPestana('ontologia')" id="tab-ontologia" class="tab-btn px-4 py-2 font-medium rounded text-slate-400 hover:text-slate-200 border border-transparent">
-        Ontología y Especialistas
-      </button>
-    </div>
+          <div class="dashboard-overview-grid">
+            <section class="summary-subcard">
+              <div class="subcard-heading">
+                <div>
+                  <h2 class="summary-heading">Actividad reciente</h2>
+                  <p class="summary-subheading">Últimos tickets registrados en GLPI</p>
+                </div>
+                <button type="button" class="text-xs text-slate-400 hover:text-slate-200" onclick="cambiarPestana('cola')">
+                  Ver cola
+                </button>
+              </div>
+              <div id="recent-tickets" class="recent-ticket-list">
+                <p class="text-xs text-slate-500">Consultando tickets...</p>
+              </div>
+            </section>
+
+            <section class="summary-subcard">
+              <div class="subcard-heading">
+                <div>
+                  <h2 class="summary-heading">Estado de solicitudes</h2>
+                  <p class="summary-subheading">Distribución del periodo consultado</p>
+                </div>
+              </div>
+              <div class="status-breakdown">
+                <div class="status-breakdown-row">
+                  <div class="status-breakdown-label"><span>Nuevos</span><strong id="estado-nuevo-val">0</strong></div>
+                  <div class="status-track"><span id="estado-nuevo-bar" class="status-fill status-new"></span></div>
+                </div>
+                <div class="status-breakdown-row">
+                  <div class="status-breakdown-label"><span>En curso</span><strong id="estado-curso-val">0</strong></div>
+                  <div class="status-track"><span id="estado-curso-bar" class="status-fill status-progress"></span></div>
+                </div>
+                <div class="status-breakdown-row">
+                  <div class="status-breakdown-label"><span>En espera</span><strong id="estado-espera-val">0</strong></div>
+                  <div class="status-track"><span id="estado-espera-bar" class="status-fill status-waiting"></span></div>
+                </div>
+                <div class="status-breakdown-row">
+                  <div class="status-breakdown-label"><span>Resueltos o cerrados</span><strong id="estado-resuelto-val">0</strong></div>
+                  <div class="status-track"><span id="estado-resuelto-bar" class="status-fill status-done"></span></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
 
     <!-- PESTANA 1: SIMULADOR DE TICKETS -->
-    <section id="sec-simulador" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <section id="sec-simulador" class="view-section grid grid-cols-1 lg:grid-cols-12 gap-6" hidden>
       <!-- Formulario de entrada -->
       <div class="lg:col-span-5 bg-slate-900 p-5 rounded-lg border border-slate-800">
         <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
@@ -453,7 +750,7 @@ HTML_INDEX = """<!DOCTYPE html>
     </section>
 
     <!-- PESTANA 2: MONITOR DE COLA GLPI -->
-    <section id="sec-cola" class="hidden bg-slate-900 p-5 rounded-lg border border-slate-800">
+    <section id="sec-cola" class="view-section tickets-panel bg-slate-900 p-5 rounded-lg border border-slate-800" hidden>
       <div class="mb-4 border-b border-slate-800 pb-3">
         <div>
           <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Tickets Recientes Registrados en GLPI</h2>
@@ -476,7 +773,7 @@ HTML_INDEX = """<!DOCTYPE html>
         </div>
       </div>
 
-      <div class="overflow-x-auto rounded border border-slate-800">
+      <div class="tickets-table-wrap overflow-x-auto rounded border border-slate-800">
         <table class="tickets-table w-full min-w-[900px] table-fixed text-left text-xs text-slate-300">
           <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
             <tr>
@@ -496,7 +793,7 @@ HTML_INDEX = """<!DOCTYPE html>
     </section>
 
     <!-- PESTANA 3: ONTOLOGIA Y TECNICOS -->
-    <section id="sec-ontologia" class="hidden space-y-6">
+    <section id="sec-ontologia" class="view-section space-y-6" hidden>
       <div class="bg-slate-900 p-5 rounded-lg border border-slate-800">
         <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-1">Catálogo Ontológico de Técnicos y Especialidades</h2>
         <p class="text-xs text-slate-400 mb-4">Mapeo entre plataformas y competencias de enrutamiento</p>
@@ -505,6 +802,8 @@ HTML_INDEX = """<!DOCTYPE html>
         </div>
       </div>
     </section>
+      </main>
+    </div>
   </div>
 
   <script>
@@ -533,7 +832,7 @@ HTML_INDEX = """<!DOCTYPE html>
       boton.innerText = claro ? 'Modo oscuro' : 'Modo claro';
       boton.setAttribute('aria-pressed', String(claro));
       boton.setAttribute('aria-label', claro ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
-      localStorage.setItem('triagent-theme', claro ? 'light' : 'dark');
+      localStorage.setItem('triagent-theme-v2', claro ? 'light' : 'dark');
     }
 
     function cambiarTema() {
@@ -554,16 +853,22 @@ HTML_INDEX = """<!DOCTYPE html>
     }
 
     function cambiarPestana(nombre) {
-      document.querySelectorAll('.tab-btn').forEach(b => {
-        b.className = 'tab-btn px-4 py-2 font-medium rounded text-slate-400 hover:text-slate-200 border border-transparent';
+      const secciones = ['resumen', 'simulador', 'cola', 'ontologia'];
+      const titulos = {
+        resumen: 'Resumen general',
+        simulador: 'Procesar una solicitud',
+        cola: 'Cola de tickets GLPI',
+        ontologia: 'Especialistas y áreas'
+      };
+      secciones.forEach(seccion => {
+        document.getElementById(`sec-${seccion}`).hidden = seccion !== nombre;
+        const enlace = document.getElementById(`nav-${seccion}`);
+        const activo = seccion === nombre;
+        enlace.classList.toggle('active', activo);
+        if (activo) enlace.setAttribute('aria-current', 'page');
+        else enlace.removeAttribute('aria-current');
       });
-      document.getElementById('tab-' + nombre).className = 'tab-btn px-4 py-2 font-medium rounded bg-slate-800 text-white border border-slate-700';
-
-      document.getElementById('sec-simulador').classList.add('hidden');
-      document.getElementById('sec-cola').classList.add('hidden');
-      document.getElementById('sec-ontologia').classList.add('hidden');
-      document.getElementById('sec-' + nombre).classList.remove('hidden');
-
+      document.getElementById('page-title').innerText = titulos[nombre];
       if (nombre === 'cola') cargarMetricasYCola();
       if (nombre === 'ontologia') cargarOntologia();
     }
@@ -575,6 +880,7 @@ HTML_INDEX = """<!DOCTYPE html>
         const data = await obtenerJSON('/api/dashboard');
         ticketsCargados = data.tickets || [];
         renderizarMetricas(data.metricas);
+        renderizarResumenActividad(ticketsCargados);
         document.getElementById('glpi-status').innerText = data.glpi_mock
           ? 'GLPI: Modo simulado'
           : 'GLPI: Conectado';
@@ -612,6 +918,42 @@ HTML_INDEX = """<!DOCTYPE html>
       });
       document.getElementById('distribucion-label').innerText =
         `${m.total} tickets · ${m.sin_urgencia} sin urgencia clasificada`;
+    }
+
+    function renderizarResumenActividad(tickets) {
+      const lista = document.getElementById('recent-tickets');
+      const recientes = tickets.slice(0, 5);
+      lista.innerHTML = recientes.length
+        ? recientes.map(ticket => {
+          const urgencia = urgenciaNombre(ticket.urgency) || 'Sin clasificar';
+          const estado = ESTADOS[Number(ticket.status)] || 'Desconocido';
+          const badge = NIVELES_COLOR[urgencia] || 'badge-unclassified';
+          return `
+            <article class="activity-row">
+              <span class="activity-id">#${escaparHTML(ticket.id)}</span>
+              <div class="activity-main">
+                <span class="activity-subject" title="${escaparHTML(ticket.name || ticket.content || '(Sin asunto)')}">${escaparHTML(ticket.name || ticket.content || '(Sin asunto)')}</span>
+                <span class="activity-meta">${escaparHTML(estado)} · ${escaparHTML(ticket.date || 'Fecha no disponible')}</span>
+              </div>
+              <span class="activity-urgency ${badge}">${escaparHTML(urgencia)}</span>
+            </article>
+          `;
+        }).join('')
+        : '<p class="text-xs text-slate-500 py-4">No hay tickets disponibles para mostrar.</p>';
+
+      const conteos = { nuevo: 0, curso: 0, espera: 0, resuelto: 0 };
+      tickets.forEach(ticket => {
+        const estado = Number(ticket.status);
+        if (estado === 1) conteos.nuevo += 1;
+        else if (estado === 2 || estado === 3) conteos.curso += 1;
+        else if (estado === 4) conteos.espera += 1;
+        else if (estado === 5 || estado === 6) conteos.resuelto += 1;
+      });
+      Object.entries(conteos).forEach(([estado, cantidad]) => {
+        document.getElementById(`estado-${estado}-val`).innerText = cantidad;
+        document.getElementById(`estado-${estado}-bar`).style.width =
+          `${tickets.length ? cantidad * 100 / tickets.length : 0}%`;
+      });
     }
 
     async function enviarTicket(e) {
@@ -825,7 +1167,7 @@ HTML_INDEX = """<!DOCTYPE html>
       }
     }
 
-    aplicarTema(localStorage.getItem('triagent-theme') || 'dark');
+    aplicarTema(localStorage.getItem('triagent-theme-v2') || 'light');
     cargarMetricasYCola();
   </script>
 </body>

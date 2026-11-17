@@ -35,6 +35,7 @@ def test_conectar_y_listar_tickets_usa_api_legacy_y_tokens():
         usuario="api-user",
         password="api-password",
         app_token="app-token",
+        user_token="",
     )
 
     with patch("triage.glpi_client.urllib.request.urlopen", side_effect=respuestas) as abrir:

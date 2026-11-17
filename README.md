@@ -1,31 +1,36 @@
-# Agente Inteligente de Triaje y Priorización de Tickets (Tooli / GLPI)
+# Agente inteligente de triaje y priorización de tickets (Tooli / GLPI)
 
-**Proyecto Final - Curso de Inteligencia Artificial**  
-*Autores: Juan Martínez & Santiago Payares*
+**Proyecto final del curso de Inteligencia Artificial**
 
-Agente híbrido inteligente (Neuro-Simbólico) para la clasificación, priorización y enrutamiento automático de tickets en la mesa de ayuda universitaria (Tooli / GLPI). Integra el ciclo completo de un agente inteligente: **Percepción**, **Razonamiento**, **Acción** y **Memoria/Aprendizaje**.
+Autores: Juan Martínez y Santiago Payares
+
+Sistema híbrido neuro-simbólico para clasificar, priorizar y enrutar solicitudes de la mesa de ayuda universitaria. Integra percepción, razonamiento, acción y memoria para procesar tickets de Tooli y GLPI.
 
 ---
 
-## 🚀 Cómo correr el proyecto
+## Inicio rápido
 
 ```bash
-# 1. Instalar dependencias (en entorno virtual)
+# Instalar dependencias
 pip install -r requirements.txt
 
-# 2. Ejecutar la demostración guiada (3 casos clave para la sustentación)
+# Ejecutar la demostración guiada
 python main.py demo
 
-# 3. Probar en vivo en modo interactivo (redacta cualquier ticket por teclado)
+# Iniciar el dashboard conectado a GLPI
+python main.py web
+```
+
+Otros comandos disponibles:
+
+```bash
+# Procesar tickets desde la consola
 python main.py interactivo
 
-# 4. Iniciar el dashboard web conectado a GLPI (simulador, cola y métricas)
-python main.py web
-
-# 5. Entrenar y evaluar todos los modelos (ML clásico, Deep Learning, Regresión SLA)
+# Entrenar y evaluar todos los modelos
 python main.py all
 
-# 6. Ejecutar toda la suite de pruebas unitarias y de integración
+# Ejecutar las pruebas
 python tests/test_rubric.py
 python tests/test_reasoning.py
 python tests/test_agent_full.py
@@ -36,20 +41,20 @@ python tests/test_glpi_client.py
 python tests/test_main.py
 ```
 
-El resumen del dashboard se calcula con los últimos 1.000 tickets consultados. El cumplimiento de SLA se muestra solo cuando GLPI entrega tanto la fecha límite como la fecha de resolución; si esos datos no existen, se indica como no disponible.
-El panel permite cambiar entre modo claro y oscuro, conserva la preferencia del navegador y adapta la cola a pantallas pequeñas.
+El dashboard ofrece navegación lateral, resumen de métricas y actividad reciente, simulador de solicitudes, cola de GLPI y catálogo de especialistas. El resumen considera hasta 1.000 tickets recientes. El indicador de SLA se calcula únicamente cuando GLPI proporciona tanto la fecha límite como la fecha de resolución. El panel ofrece modos claro y oscuro, conserva la preferencia de tema y adapta la interfaz a pantallas pequeñas.
 
-La prioridad ya no interpreta por sí sola una falla como bloqueo: usa señales explícitas de interrupción, reconoce consultas y distingue una fecha futura de una actividad en curso. Una falla grupal bloqueante con alternativa temporal se clasifica como Alta; sin alternativa, como Crítica. `tests/test_priority_cases.py` valida las reglas contra las 24 muestras de `data/gold_manual.csv` (con fechas separadas para aislar los casos del detector de incidentes); es una prueba de ese conjunto, no una garantía de precisión sobre tickets reales.
+La asignación de prioridad considera señales de interrupción, diferencia consultas de fallas y distingue fechas futuras de actividades inmediatas. Una falla grupal bloqueante con alternativa temporal se clasifica como Alta; sin alternativa, como Crítica. `tests/test_priority_cases.py` compara las reglas con las 24 muestras de `data/gold_manual.csv`. Esta evaluación mide ese conjunto y no garantiza el mismo rendimiento con tickets reales.
 
-Otros comandos individuales:
-- `python main.py deep`: Entrena y evalúa la variante de Deep Learning (Red Neuronal Multicapa MLP).
-- `python main.py sla`: Entrena y compara los modelos estadísticos de regresión (Lineal vs Polinomial vs Ridge) para tiempos de resolución y riesgo SLA.
-- `python main.py generate`: Genera el dataset sintético con ruido controlado (`data/tickets_sinteticos.csv`).
-- `python main.py train`: Entrena el modelo clásico supervisado (TF-IDF + Regresión Logística).
+Comandos de entrenamiento individuales:
+
+- `python main.py deep`: entrena y evalúa la red neuronal multicapa.
+- `python main.py sla`: compara modelos de regresión para estimar tiempos de resolución y riesgo de SLA.
+- `python main.py generate`: genera `data/tickets_sinteticos.csv`.
+- `python main.py train`: entrena el modelo supervisado TF-IDF y Regresión Logística.
 
 ---
 
-## 🏛️ Arquitectura del Agente (Mapeada a la Rúbrica)
+## Arquitectura del agente
 
 ```
         ┌────────────────────────────────────────────────────────┐
@@ -103,9 +108,9 @@ Otros comandos individuales:
 
 ---
 
-## 📚 Técnicas del Curso de IA Implementadas
+## Técnicas de inteligencia artificial
 
-| Técnica del Curso | Módulo en el Código | Justificación y Función en el Agente |
+| Técnica | Módulo | Función |
 | :--- | :--- | :--- |
 | **Lógica de Primer Orden (FOL)** | `src/triage/fol_rules.py` | Reglas deductivas de Horn para deducir urgencia y actuar como **red de seguridad auditada** cuando el modelo ML se equivoca en un caso crítico. |
 | **Ontologías** | `src/triage/ontology.py`, `config/ontology.yaml` | Grafo jerárquico de conocimiento: mapea plataformas (Teams, Banner, Wi-Fi) a grupos de soporte, técnicos y políticas de SLA. |
@@ -116,22 +121,22 @@ Otros comandos individuales:
 
 ---
 
-## 📊 Comparativa Experimental
+## Evaluación experimental
 
-### Urgencia: Modelo Clásico vs Deep Learning
+### Clasificación de urgencia
 
-| Modelo | Conjunto | Accuracy | Macro-F1 | Críticos Subestimados (Error más grave) |
+| Modelo | Conjunto | Exactitud | Macro-F1 | Casos críticos subestimados |
 | :--- | :--- | :--- | :--- | :--- |
 | **Regresión Logística (TF-IDF)** | Sintético (Test) | 0.73 | 0.70 | 14.7% |
 | **Deep Learning (Red MLP)** | Sintético (Test) | **0.80** | **0.76** | **13.1%** |
 | **Regresión Logística (TF-IDF)** | Gold Manual (24 tickets) | 0.50 | 0.46 | 33.3% |
 | **Deep Learning (Red MLP)** | Gold Manual (24 tickets) | **0.54** | **0.50** | 66.7% (ML solo) $\to$ **0.0% con Red FOL** |
 
-> **Hallazgo fundamental de diseño**: La red neuronal y el modelo supervisado por sí solos pueden fallar ante redacciones informales inéditas en casos críticos. **La Red de Seguridad en Lógica de Primer Orden (FOL) y la Ontología rescatan estos casos**, garantizando que ninguna falla bloqueante con examen próximo quede desatendida.
+> **Hallazgo de diseño:** los modelos supervisados pueden fallar ante redacciones nuevas o informales. Las reglas FOL y la ontología complementan la predicción y ayudan a priorizar los casos bloqueantes urgentes; no sustituyen la revisión humana.
 
 ---
 
-## 🐳 Despliegue de GLPI con Docker
+## Despliegue e integración con GLPI
 
 `python main.py web` inicia automáticamente los servicios de GLPI con Docker Compose, espera a que el puerto local responda y después conecta el dashboard. Docker Engine/Desktop debe estar abierto.
 

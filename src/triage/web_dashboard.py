@@ -334,6 +334,51 @@ HTML_INDEX = """<!DOCTYPE html>
     .status-done { background: #b8c5d2; }
     .tickets-panel { display: flex; flex-direction: column; min-height: 0; }
     .tickets-table-wrap { max-height: calc(100vh - 16rem); overflow: auto; }
+    .feedback-dialog {
+      width: min(440px, calc(100vw - 2rem));
+      margin: auto;
+      padding: 0;
+      color: #344054;
+      background: #fff;
+      border: 1px solid #dfe4eb;
+      border-radius: 0.9rem;
+      box-shadow: 0 24px 70px rgba(31, 41, 55, 0.2);
+    }
+    .feedback-dialog::backdrop { background: rgba(31, 41, 55, 0.3); backdrop-filter: blur(2px); }
+    .feedback-dialog-content { padding: 1.4rem; }
+    .feedback-dialog-title { color: #344054; font-size: 1.05rem; font-weight: 650; }
+    .feedback-dialog-description { margin-top: 0.3rem; color: #7a8492; font-size: 0.82rem; }
+    .feedback-select {
+      width: 100%;
+      margin-top: 0.65rem;
+      padding: 0.65rem 0.75rem;
+      color: #344054;
+      background: #f8f9fb;
+      border: 1px solid #dce1e8;
+      border-radius: 0.55rem;
+      font: inherit;
+      font-size: 0.9rem;
+    }
+    .feedback-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 1.25rem; }
+    .feedback-action {
+      padding: 0.55rem 0.85rem;
+      border: 1px solid #dce1e8;
+      border-radius: 0.55rem;
+      color: #596579;
+      background: #f6f7f9;
+      font: inherit;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .feedback-action-primary { color: #30455f; background: #dce6f1; border-color: #cbd9e8; }
+    .feedback-action:disabled { opacity: 0.6; cursor: wait; }
+    .feedback-error { margin-top: 0.75rem; color: #a96d76; font-size: 0.8rem; }
+    .theme-dark .feedback-dialog { color: #e2e8f0; background: #111827; border-color: #334155; }
+    .theme-dark .feedback-dialog-title { color: #e2e8f0; }
+    .theme-dark .feedback-dialog-description { color: #94a3b8; }
+    .theme-dark .feedback-select { color: #e2e8f0; background: #1f2937; border-color: #475569; }
+    .theme-dark .feedback-action { color: #cbd5e1; background: #1f2937; border-color: #475569; }
+    .theme-dark .feedback-action-primary { color: #e2e8f0; background: #34445b; border-color: #50627a; }
     .theme-light .topbar-actions .bg-slate-800 { background: #f3f4f6; color: #5b6472; border-color: #e1e4e9; }
     .theme-light .topbar-actions .hover\\:bg-slate-700:hover { background: #e9edf2; }
     .theme-light .app-shell { background: #f4f5f7; }
@@ -802,6 +847,25 @@ HTML_INDEX = """<!DOCTYPE html>
         </div>
       </div>
     </section>
+
+    <dialog id="feedback-dialog" class="feedback-dialog" aria-labelledby="feedback-dialog-title">
+      <form class="feedback-dialog-content" onsubmit="event.preventDefault(); guardarCorreccionHumana();">
+        <h2 id="feedback-dialog-title" class="feedback-dialog-title">Corregir urgencia</h2>
+        <p class="feedback-dialog-description">Selecciona la prioridad correcta para guardar esta corrección.</p>
+        <label for="feedback-urgencia" class="block text-xs font-medium text-slate-500 mt-4">Urgencia corregida</label>
+        <select id="feedback-urgencia" class="feedback-select">
+          <option value="Crítica">Crítica</option>
+          <option value="Alta">Alta</option>
+          <option value="Media">Media</option>
+          <option value="Baja">Baja</option>
+        </select>
+        <p id="feedback-error" class="feedback-error" role="alert" hidden></p>
+        <div class="feedback-actions">
+          <button type="button" class="feedback-action" onclick="cerrarDialogoCorreccion()">Cancelar</button>
+          <button id="feedback-submit" type="submit" class="feedback-action feedback-action-primary">Guardar corrección</button>
+        </div>
+      </form>
+    </dialog>
       </main>
     </div>
   </div>
@@ -823,6 +887,7 @@ HTML_INDEX = """<!DOCTYPE html>
     };
     let ticketsCargados = [];
     let filtroActual = 'todos';
+    let ticketFeedbackActual = null;
 
     function aplicarTema(tema) {
       const claro = tema === 'light';
@@ -1093,7 +1158,7 @@ HTML_INDEX = """<!DOCTYPE html>
         const estadoNombre = ESTADOS[estado] || 'Desconocido';
         const id = Number.parseInt(ticket.id, 10);
         const botonFeedback = Number.isSafeInteger(id)
-          ? `<button onclick="corregirHumano(${id})" title="Corregir la urgencia" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded border border-slate-700 transition whitespace-nowrap">Corregir</button>`
+          ? `<button onclick="corregirHumano(${id}, '${NIVELES_COLOR[urgencia] ? urgencia : 'Media'}')" title="Corregir la urgencia" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded border border-slate-700 transition whitespace-nowrap">Corregir</button>`
           : '<span class="text-slate-500">No disponible</span>';
         return `
           <tr class="hover:bg-slate-950">
@@ -1117,20 +1182,42 @@ HTML_INDEX = """<!DOCTYPE html>
       return Object.keys(NIVELES_COLOR).find(nivel => nivel.toLocaleLowerCase() === String(valor).toLocaleLowerCase()) || null;
     }
 
-    async function corregirHumano(id) {
-      const nuevaUrg = prompt('Ingresa la corrección de urgencia (Crítica, Alta, Media, Baja):', 'Alta');
-      if (!nuevaUrg) return;
+    function corregirHumano(id, urgenciaActual) {
+      ticketFeedbackActual = id;
+      const selector = document.getElementById('feedback-urgencia');
+      selector.value = NIVELES_COLOR[urgenciaActual] ? urgenciaActual : 'Media';
+      document.getElementById('feedback-error').hidden = true;
+      document.getElementById('feedback-error').innerText = '';
+      document.getElementById('feedback-dialog').showModal();
+    }
+
+    function cerrarDialogoCorreccion() {
+      document.getElementById('feedback-dialog').close();
+      ticketFeedbackActual = null;
+    }
+
+    async function guardarCorreccionHumana() {
+      if (ticketFeedbackActual === null) return;
+      const boton = document.getElementById('feedback-submit');
+      const errorEl = document.getElementById('feedback-error');
+      boton.disabled = true;
       try {
         const res = await obtenerJSON('/api/feedback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id_ticket: id, urgencia_corregida: nuevaUrg })
+          body: JSON.stringify({
+            id_ticket: ticketFeedbackActual,
+            urgencia_corregida: document.getElementById('feedback-urgencia').value
+          })
         });
         if (!res.ok) throw new Error(res.mensaje || 'No se pudo registrar la corrección');
-        alert('Corrección registrada. El agente ahora utilizará este aprendizaje para casos similares.');
+        cerrarDialogoCorreccion();
         await cargarMetricasYCola();
-      } catch (e) {
-        alert('Error: ' + e);
+      } catch (error) {
+        errorEl.innerText = error.message;
+        errorEl.hidden = false;
+      } finally {
+        boton.disabled = false;
       }
     }
 
@@ -1308,34 +1395,68 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if not id_t or urg_corregida not in ("Crítica", "Alta", "Media", "Baja"):
                 self.send_error(400, "Ticket y urgencia válidos son obligatorios")
                 return
+            try:
+                id_glpi = int(id_t)
+                if id_glpi <= 0:
+                    raise ValueError
+            except ValueError:
+                self.send_error(400, "El identificador del ticket debe ser un entero positivo")
+                return
+
+            if not self.cliente_glpi:
+                self.enviar_json(
+                    {"ok": False, "mensaje": "No hay un cliente de GLPI configurado."},
+                    status=503,
+                )
+                return
+
             asunto = ""
             desc = ""
 
-            if str(id_t) in self.agente.memoria.historial_decisiones:
-                tk = self.agente.memoria.historial_decisiones[str(id_t)]["ticket"]
-                asunto = tk.get("asunto", "")
-                desc = tk.get("descripcion", "")
-            elif self.cliente_glpi and self.cliente_glpi.session_token:
-                try:
-                    glpi_tk = self.cliente_glpi.obtener_ticket(int(id_t))
+            try:
+                if id_t in self.agente.memoria.historial_decisiones:
+                    tk = self.agente.memoria.historial_decisiones[id_t]["ticket"]
+                    asunto = tk.get("asunto", "")
+                    desc = tk.get("descripcion", "")
+                else:
+                    glpi_tk = self.cliente_glpi.obtener_ticket(id_glpi)
                     asunto = glpi_tk.get("name", "")
                     desc = glpi_tk.get("content", "")
-                except (ValueError, GLPIError) as error:
-                    self.enviar_json(
-                        {"ok": False, "mensaje": f"No se pudo consultar el ticket en GLPI: {error}"},
-                        status=502,
-                    )
-                    return
+                self.cliente_glpi.actualizar_urgencia(id_glpi, urg_corregida)
+            except GLPIError as error:
+                self.enviar_json(
+                    {"ok": False, "mensaje": f"No se pudo actualizar la urgencia en GLPI: {error}"},
+                    status=502,
+                )
+                return
 
-            self.agente.memoria.registrar_feedback_humano(
-                id_ticket=id_t,
-                urgencia_humana=urg_corregida,
-                formulario_humano="Fallas Técnicas TIC",
-                comentarios="Ajuste manual del tecnico desde Dashboard",
-                asunto=asunto,
-                descripcion=desc,
-            )
-            self.enviar_json({"ok": True, "mensaje": "Correccion registrada en la memoria activa del agente."})
+            try:
+                self.agente.memoria.registrar_feedback_humano(
+                    id_ticket=id_t,
+                    urgencia_humana=urg_corregida,
+                    formulario_humano="Fallas Técnicas TIC",
+                    comentarios="Ajuste manual del tecnico desde Dashboard",
+                    asunto=asunto,
+                    descripcion=desc,
+                )
+            except OSError as error:
+                self.enviar_json(
+                    {
+                        "ok": False,
+                        "mensaje": (
+                            "La urgencia se actualizó en GLPI, pero no se pudo guardar "
+                            f"el aprendizaje local: {error}"
+                        ),
+                        "glpi_actualizado": True,
+                    },
+                    status=500,
+                )
+                return
+            self.enviar_json({
+                "ok": True,
+                "mensaje": "Urgencia actualizada en GLPI y corrección guardada para el aprendizaje.",
+                "glpi_actualizado": True,
+            })
             return
 
         self.send_error(404, "Not Found")

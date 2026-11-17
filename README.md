@@ -170,3 +170,5 @@ La instalación de GLPI y la configuración de su API se hacen una sola vez y pe
 Este comando también levanta los contenedores si están detenidos; no inicia Docker Engine/Desktop por sí mismo.
 
 El dashboard lee `.env` automáticamente; también respeta variables de entorno que ya estén definidas en la terminal. Si `GLPI_USER_TOKEN` está configurado, se usa para autenticar en lugar de usuario/contraseña; si no, se usa autenticación Basic. El App-Token se envía en ambos casos. El servidor no inicia en modo simulado si falla la conexión: muestra el error de GLPI para que puedas corregir la configuración. Los tests usan el mock solo cuando lo solicitan explícitamente.
+
+En la cola, **Corregir** actualiza únicamente la urgencia del ticket en GLPI y luego guarda la corrección para el aprendizaje local; no cambia el estado del ticket. El usuario/token configurado debe tener permisos para actualizar tickets. Si GLPI rechaza el cambio, el dashboard muestra el error y no registra una corrección local como si se hubiera aplicado.

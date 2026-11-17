@@ -218,6 +218,24 @@ class ClienteGLPI:
         )
         return True
 
+    def actualizar_urgencia(self, id_ticket: int, urgencia_nombre: str) -> bool:
+        """Cambia únicamente la urgencia de un ticket existente en GLPI."""
+        urgencia = MAPA_URGENCIAS_GLPI.get(urgencia_nombre)
+        if urgencia is None:
+            raise GLPIError(f"Urgencia no válida para GLPI: {urgencia_nombre}")
+        if self.modo_mock:
+            if id_ticket not in self.tickets_mock:
+                self.tickets_mock[id_ticket] = {"id": id_ticket, "status": 1}
+            self.tickets_mock[id_ticket]["urgency"] = urgencia
+            return True
+        self._asegurar_sesion()
+        self._solicitar(
+            f"Ticket/{id_ticket}",
+            metodo="PUT",
+            payload={"input": {"id": id_ticket, "urgency": urgencia}},
+        )
+        return True
+
     def registrar_respuesta_preliminar(self, id_ticket: int, respuesta_texto: str) -> bool:
         """Añade un seguimiento público al ticket."""
         if self.modo_mock:

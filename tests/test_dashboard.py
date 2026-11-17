@@ -123,9 +123,106 @@ def test_fallo_al_crear_ticket_devuelve_error_sin_identificador_simulado():
         DashboardHandler.agente = agente_anterior
 
 
+def test_endpoint_feedback_guarda_urgencia_seleccionada():
+    class MemoriaFalsa:
+        historial_decisiones = {
+            "45": {"ticket": {"asunto": "Acceso al portal", "descripcion": "No puedo ingresar"}}
+        }
+
+        def __init__(self):
+            self.registro = None
+            self.fallar_al_guardar = False
+
+        def registrar_feedback_humano(self, **datos):
+            if self.fallar_al_guardar:
+                raise OSError("archivo de memoria no disponible")
+            self.registro = datos
+
+    class AgenteFalso:
+        def __init__(self):
+            self.memoria = MemoriaFalsa()
+
+    class ClienteGLPIFalso:
+        def __init__(self):
+            self.urgencias = []
+            self.fallar_al_actualizar = False
+
+        def actualizar_urgencia(self, id_ticket, urgencia):
+            if self.fallar_al_actualizar:
+                raise GLPIError("Permiso de actualización denegado")
+            self.urgencias.append((id_ticket, urgencia))
+            return True
+
+    agente_anterior = DashboardHandler.agente
+    cliente_anterior = DashboardHandler.cliente_glpi
+    agente = AgenteFalso()
+    cliente = ClienteGLPIFalso()
+    DashboardHandler.agente = agente
+    DashboardHandler.cliente_glpi = cliente
+    servidor = HTTPServer(("127.0.0.1", 0), DashboardHandler)
+    hilo = Thread(target=servidor.serve_forever, daemon=True)
+    hilo.start()
+    try:
+        solicitud = urllib.request.Request(
+            f"http://127.0.0.1:{servidor.server_port}/api/feedback",
+            data=json.dumps({"id_ticket": 45, "urgencia_corregida": "Alta"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(solicitud) as respuesta:
+            datos = json.loads(respuesta.read().decode("utf-8"))
+        assert datos["ok"] is True
+        assert datos["glpi_actualizado"] is True
+        assert agente.memoria.registro["urgencia_humana"] == "Alta"
+        assert agente.memoria.registro["asunto"] == "Acceso al portal"
+        assert cliente.urgencias == [(45, "Alta")]
+
+        cliente.fallar_al_actualizar = True
+        solicitud = urllib.request.Request(
+            f"http://127.0.0.1:{servidor.server_port}/api/feedback",
+            data=json.dumps({"id_ticket": 45, "urgencia_corregida": "Baja"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urlopen(solicitud)
+        except urllib.error.HTTPError as error:
+            datos = json.loads(error.read().decode("utf-8"))
+            assert error.code == 502
+            assert "Permiso de actualización denegado" in datos["mensaje"]
+            assert agente.memoria.registro["urgencia_humana"] == "Alta"
+        else:
+            raise AssertionError("Expected the GLPI update error to be reported")
+
+        cliente.fallar_al_actualizar = False
+        agente.memoria.fallar_al_guardar = True
+        solicitud = urllib.request.Request(
+            f"http://127.0.0.1:{servidor.server_port}/api/feedback",
+            data=json.dumps({"id_ticket": 45, "urgencia_corregida": "Baja"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urlopen(solicitud)
+        except urllib.error.HTTPError as error:
+            datos = json.loads(error.read().decode("utf-8"))
+            assert error.code == 500
+            assert datos["glpi_actualizado"] is True
+            assert "archivo de memoria no disponible" in datos["mensaje"]
+        else:
+            raise AssertionError("Expected the feedback persistence error to be reported")
+    finally:
+        servidor.shutdown()
+        hilo.join()
+        servidor.server_close()
+        DashboardHandler.agente = agente_anterior
+        DashboardHandler.cliente_glpi = cliente_anterior
+
+
 if __name__ == "__main__":
     test_resumen_tickets_y_cumplimiento_sla()
     test_resumen_sin_tickets_o_datos_de_sla()
     test_endpoint_dashboard_usa_todos_los_tickets()
     test_fallo_al_crear_ticket_devuelve_error_sin_identificador_simulado()
+    test_endpoint_feedback_guarda_urgencia_seleccionada()
     print("dashboard ok")

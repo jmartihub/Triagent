@@ -127,6 +127,27 @@ def test_crear_actualizar_y_seguir_ticket_en_glpi():
     assert solicitudes[3].args[0].full_url.endswith("/Ticket/41/ITILFollowup")
 
 
+def test_actualizar_urgencia_no_modifica_estado_del_ticket():
+    respuestas = [
+        FakeResponse({"session_token": "session-1"}),
+        FakeResponse(b""),
+    ]
+    cliente = ClienteGLPI(
+        url_base="http://glpi.test/apirest.php",
+        user_token="user-token",
+        app_token="app-token",
+    )
+
+    with patch("triage.glpi_client.urllib.request.urlopen", side_effect=respuestas) as abrir:
+        cliente.conectar()
+        assert cliente.actualizar_urgencia(17, "Media") is True
+
+    solicitud = abrir.call_args_list[1].args[0]
+    assert solicitud.full_url == "http://glpi.test/apirest.php/Ticket/17"
+    assert solicitud.get_method() == "PUT"
+    assert json.loads(solicitud.data) == {"input": {"id": 17, "urgency": 3}}
+
+
 def test_mock_solo_se_usa_si_se_solicita_explicita_y_directamente():
     cliente = ClienteGLPI(modo_mock=True)
     assert cliente.conectar() is True
@@ -141,5 +162,6 @@ if __name__ == "__main__":
     test_conectar_usa_user_token_y_app_token_sin_basic_auth()
     test_error_de_api_no_activa_modo_simulado()
     test_crear_actualizar_y_seguir_ticket_en_glpi()
+    test_actualizar_urgencia_no_modifica_estado_del_ticket()
     test_mock_solo_se_usa_si_se_solicita_explicita_y_directamente()
     print("GLPI client tests passed")

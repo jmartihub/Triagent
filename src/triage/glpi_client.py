@@ -1,23 +1,15 @@
-"""Cliente de Integración con la API REST de GLPI.
-
-Permite al agente interactuar con una instancia real de GLPI (en Docker o servidor)
-o en modo simulado/mock si el contenedor no está activo:
-- Autenticación mediante HTTP Basic Auth (admin: glpi/glpi) o User-Token
-- Consulta de tickets pendientes de triaje (Estado = 'Nuevo', status=1)
-- Actualización de campos verificables: Urgencia (1 a 5), Estado (Asignado/En curso, status=2)
-- Registro del acuse de recibo y respuesta preliminar (ITIL Followup)
-"""
+"""Cliente de integración con la API REST legacy de GLPI."""
 
 import base64
-from dataclasses import dataclass
 import json
+import os
 from typing import Any, Dict, List, Optional
 import urllib.error
 import urllib.request
 
 
 MAPA_URGENCIAS_GLPI = {
-    "Baja": 2,      # GLPI: 1=Muy baja, 2=Baja, 3=Media, 4=Alta, 5=Muy alta (Crítica)
+    "Baja": 2,
     "Media": 3,
     "Alta": 4,
     "Crítica": 5,
@@ -32,104 +24,152 @@ MAPA_GLPI_A_URGENCIA = {
 }
 
 
+class GLPIError(RuntimeError):
+    """Error de conexión o de operación devuelto por GLPI."""
+
+
 class ClienteGLPI:
-    """Cliente para la API REST de GLPI con soporte para instancia real en Docker y modo mock."""
+    """Cliente para la API legacy de GLPI y el modo simulado explícito de pruebas."""
 
     def __init__(
         self,
-        url_base: str = "http://localhost:8080/apirest.php",
-        usuario: str = "glpi",
-        password: str = "glpi",
+        url_base: Optional[str] = None,
+        usuario: Optional[str] = None,
+        password: Optional[str] = None,
+        app_token: Optional[str] = None,
+        user_token: Optional[str] = None,
         modo_mock: bool = False,
     ):
-        self.url_base = url_base.rstrip("/")
-        self.usuario = usuario
-        self.password = password
+        self.url_base = (url_base or os.getenv(
+            "GLPI_API_URL", "http://localhost:8080/apirest.php"
+        )).rstrip("/")
+        self.usuario = usuario if usuario is not None else os.getenv("GLPI_USER", "glpi")
+        self.password = password if password is not None else os.getenv("GLPI_PASSWORD", "glpi")
+        self.app_token = app_token if app_token is not None else os.getenv("GLPI_APP_TOKEN", "")
+        self.user_token = user_token if user_token is not None else os.getenv("GLPI_USER_TOKEN", "")
         self.modo_mock = modo_mock
         self.session_token: Optional[str] = None
-
-        # Almacenamiento en memoria para modo mock
         self.tickets_mock: Dict[int, Dict[str, Any]] = {}
         self.seguimientos_mock: Dict[int, List[str]] = {}
+
+    def _solicitar(
+        self,
+        endpoint: str,
+        metodo: str = "GET",
+        payload: Optional[Dict[str, Any]] = None,
+        incluir_autenticacion: bool = False,
+        timeout: int = 5,
+    ) -> Any:
+        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+        if self.session_token:
+            headers["Session-Token"] = self.session_token
+        if self.app_token:
+            headers["App-Token"] = self.app_token
+        if incluir_autenticacion:
+            if self.user_token:
+                headers["Authorization"] = f"user_token {self.user_token}"
+            else:
+                auth = base64.b64encode(f"{self.usuario}:{self.password}".encode()).decode()
+                headers["Authorization"] = f"Basic {auth}"
+
+        data = json.dumps(payload).encode() if payload is not None else None
+        request = urllib.request.Request(
+            f"{self.url_base}/{endpoint.lstrip('/')}",
+            data=data,
+            headers=headers,
+            method=metodo,
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                body = response.read().decode()
+        except urllib.error.HTTPError as error:
+            detalle = error.read().decode(errors="replace").strip()
+            raise GLPIError(
+                f"GLPI respondió HTTP {error.code} en {endpoint}: "
+                f"{detalle or error.reason}"
+            ) from error
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            motivo = getattr(error, "reason", error)
+            raise GLPIError(f"No se pudo conectar con GLPI en {self.url_base}: {motivo}") from error
+
+        if not body:
+            return None
+        try:
+            respuesta = json.loads(body)
+        except json.JSONDecodeError as error:
+            raise GLPIError(f"GLPI devolvió una respuesta JSON inválida en {endpoint}.") from error
+        if (
+            isinstance(respuesta, list)
+            and respuesta
+            and isinstance(respuesta[0], str)
+            and respuesta[0].startswith("ERROR")
+        ):
+            raise GLPIError(f"GLPI devolvió un error en {endpoint}: {respuesta}")
+        return respuesta
+
+    def _asegurar_sesion(self):
+        if not self.modo_mock and not self.session_token:
+            raise GLPIError("No hay una sesión activa con GLPI. Reinicia el dashboard para reconectar.")
 
     def conectar(self) -> bool:
         if self.modo_mock:
             self.session_token = "mock_session_token_12345"
             return True
 
-        auth_str = f"{self.usuario}:{self.password}"
-        b64_auth = base64.b64encode(auth_str.encode()).decode()
-
-        req = urllib.request.Request(
-            f"{self.url_base}/initSession",
-            headers={
-                "Authorization": f"Basic {b64_auth}",
-                "Content-Type": "application/json",
-            },
-            method="GET",
+        respuesta = self._solicitar(
+            "initSession",
+            incluir_autenticacion=True,
+            timeout=8,
         )
-        try:
-            with urllib.request.urlopen(req, timeout=4) as resp:
-                data = json.loads(resp.read().decode())
-                self.session_token = data.get("session_token")
-                return True
-        except Exception:
-            # Fallback seguro a modo mock
-            self.modo_mock = True
-            self.session_token = "mock_session_token_12345"
-            return False
+        if (
+            not isinstance(respuesta, dict)
+            or not isinstance(respuesta.get("session_token"), str)
+            or not respuesta["session_token"]
+        ):
+            raise GLPIError("GLPI no devolvió un session_token al iniciar sesión.")
+        self.session_token = respuesta["session_token"]
+        return True
+
+    def obtener_ticket(self, id_ticket: int) -> Dict[str, Any]:
+        if self.modo_mock:
+            return self.tickets_mock.get(id_ticket, {})
+        self._asegurar_sesion()
+        respuesta = self._solicitar(f"Ticket/{id_ticket}")
+        if not isinstance(respuesta, dict):
+            raise GLPIError(f"GLPI devolvió datos inválidos para el ticket {id_ticket}.")
+        return respuesta
 
     def obtener_tickets_nuevos(self) -> List[Dict[str, Any]]:
-        """Obtiene tickets con estado 'Nuevo' (status=1 en GLPI)."""
-        if self.modo_mock or not self.session_token:
-            return [t for t in self.tickets_mock.values() if t.get("status") == 1]
-
-        url = f"{self.url_base}/Ticket?is_deleted=0"
-        req = urllib.request.Request(
-            url,
-            headers={
-                "Session-Token": self.session_token,
-                "Content-Type": "application/json",
-            },
-            method="GET",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                todos = json.loads(resp.read().decode())
-                # Filtrar los que tengan status 1 (Nuevo)
-                nuevos = [t for t in todos if t.get("status") == 1]
-                return nuevos
-        except Exception:
-            return []
+        """Obtiene tickets con estado Nuevo (status=1 en GLPI)."""
+        if self.modo_mock:
+            return [ticket for ticket in self.tickets_mock.values() if ticket.get("status") == 1]
+        self._asegurar_sesion()
+        respuesta = self._solicitar("Ticket?is_deleted=0&range=0-999")
+        if not isinstance(respuesta, list):
+            raise GLPIError("GLPI devolvió un listado de tickets con formato inesperado.")
+        return [ticket for ticket in respuesta if ticket.get("status") == 1]
 
     def obtener_todos_los_tickets(self, limite: int = 100) -> List[Dict[str, Any]]:
-        """Obtiene el listado completo de tickets ordenados de más reciente a más antiguo."""
+        """Obtiene los tickets más recientes de GLPI."""
         if limite <= 0:
             return []
-        if self.modo_mock or not self.session_token:
-            return sorted(self.tickets_mock.values(), key=lambda t: t.get("id", 0), reverse=True)[:limite]
-
-        url = f"{self.url_base}/Ticket?is_deleted=0&range=0-{limite - 1}&order=DESC"
-        req = urllib.request.Request(
-            url,
-            headers={
-                "Session-Token": self.session_token,
-                "Content-Type": "application/json",
-            },
-            method="GET",
+        if self.modo_mock:
+            return sorted(
+                self.tickets_mock.values(),
+                key=lambda ticket: ticket.get("id", 0),
+                reverse=True,
+            )[:limite]
+        self._asegurar_sesion()
+        respuesta = self._solicitar(
+            f"Ticket?is_deleted=0&range=0-{limite - 1}&order=DESC"
         )
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                todos = json.loads(resp.read().decode())
-                if isinstance(todos, list):
-                    return sorted(todos, key=lambda t: t.get("id", 0), reverse=True)
-                return []
-        except Exception:
-            return sorted(self.tickets_mock.values(), key=lambda t: t.get("id", 0), reverse=True)
+        if not isinstance(respuesta, list):
+            raise GLPIError("GLPI devolvió un listado de tickets con formato inesperado.")
+        return sorted(respuesta, key=lambda ticket: int(ticket.get("id", 0)), reverse=True)
 
-    def crear_ticket(self, nombre: str, contenido: str, urgencia_inicial: int = 3) -> Optional[int]:
-        """Crea un ticket en GLPI (usado por el simulador de Tooli/estudiante)."""
-        if self.modo_mock or not self.session_token:
+    def crear_ticket(self, nombre: str, contenido: str, urgencia_inicial: int = 3) -> int:
+        """Crea un ticket y devuelve su identificador real de GLPI."""
+        if self.modo_mock:
             nuevo_id = max(self.tickets_mock.keys(), default=0) + 1
             self.tickets_mock[nuevo_id] = {
                 "id": nuevo_id,
@@ -139,116 +179,69 @@ class ClienteGLPI:
                 "urgency": urgencia_inicial,
             }
             return nuevo_id
-
-        payload = json.dumps({
-            "input": {
-                "name": nombre,
-                "content": contenido,
-                "urgency": urgencia_inicial,
-                "status": 1,
-            }
-        }).encode()
-
-        req = urllib.request.Request(
-            f"{self.url_base}/Ticket",
-            data=payload,
-            headers={
-                "Session-Token": self.session_token,
-                "Content-Type": "application/json",
+        self._asegurar_sesion()
+        respuesta = self._solicitar(
+            "Ticket",
+            metodo="POST",
+            payload={
+                "input": {
+                    "name": nombre,
+                    "content": contenido,
+                    "urgency": urgencia_inicial,
+                    "status": 1,
+                }
             },
-            method="POST",
         )
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                res = json.loads(resp.read().decode())
-                return res.get("id")
-        except Exception:
-            return None
+        if not isinstance(respuesta, dict) or not respuesta.get("id"):
+            raise GLPIError(f"GLPI no confirmó la creación del ticket: {respuesta!r}")
+        return int(respuesta["id"])
 
     def actualizar_ticket(
         self,
         id_ticket: int,
         urgencia_nombre: str,
-        tecnico_nombre: str,
-        formulario_nombre: str,
+        tecnico_nombre: str = "",
+        formulario_nombre: str = "",
     ) -> bool:
-        """Escribe en GLPI la urgencia estimada y cambia el estado a en curso."""
-        urg_val = MAPA_URGENCIAS_GLPI.get(urgencia_nombre, 3)
-
-        if self.modo_mock or not self.session_token:
+        """Actualiza la urgencia y pone el ticket en curso en GLPI."""
+        urgencia = MAPA_URGENCIAS_GLPI.get(urgencia_nombre, 3)
+        if self.modo_mock:
             if id_ticket not in self.tickets_mock:
                 self.tickets_mock[id_ticket] = {"id": id_ticket, "status": 1}
-            self.tickets_mock[id_ticket].update({
-                "urgency": urg_val,
-                "urgencia_nombre": urgencia_nombre,
-                "tecnico_asignado": tecnico_nombre,
-                "formulario_final": formulario_nombre,
-                "status": 2,  # Asignado
-            })
+            self.tickets_mock[id_ticket].update({"urgency": urgencia, "status": 2})
             return True
-
-        payload = json.dumps({
-            "input": {
-                "id": id_ticket,
-                "urgency": urg_val,
-                "status": 2,
-            }
-        }).encode()
-
-        req = urllib.request.Request(
-            f"{self.url_base}/Ticket/{id_ticket}",
-            data=payload,
-            headers={
-                "Session-Token": self.session_token,
-                "Content-Type": "application/json",
-            },
-            method="PUT",
+        self._asegurar_sesion()
+        self._solicitar(
+            f"Ticket/{id_ticket}",
+            metodo="PUT",
+            payload={"input": {"id": id_ticket, "urgency": urgencia, "status": 2}},
         )
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                return resp.status in (200, 204)
-        except Exception:
-            return False
+        return True
 
     def registrar_respuesta_preliminar(self, id_ticket: int, respuesta_texto: str) -> bool:
-        """Añade un seguimiento público (ITILFollowup) visible para el estudiante."""
-        if self.modo_mock or not self.session_token:
+        """Añade un seguimiento público al ticket."""
+        if self.modo_mock:
             self.seguimientos_mock.setdefault(id_ticket, []).append(respuesta_texto)
             return True
-
-        payload = json.dumps({
-            "input": {
-                "items_id": id_ticket,
-                "itemtype": "Ticket",
-                "content": respuesta_texto,
-                "is_private": 0,
-            }
-        }).encode()
-
-        req = urllib.request.Request(
-            f"{self.url_base}/Ticket/{id_ticket}/ITILFollowup",
-            data=payload,
-            headers={
-                "Session-Token": self.session_token,
-                "Content-Type": "application/json",
+        self._asegurar_sesion()
+        self._solicitar(
+            f"Ticket/{id_ticket}/ITILFollowup",
+            metodo="POST",
+            payload={
+                "input": {
+                    "items_id": id_ticket,
+                    "itemtype": "Ticket",
+                    "content": respuesta_texto,
+                    "is_private": 0,
+                }
             },
-            method="POST",
         )
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                return resp.status in (200, 201)
-        except Exception:
-            return False
+        return True
 
     def desconectar(self):
         if not self.modo_mock and self.session_token:
             try:
-                req = urllib.request.Request(
-                    f"{self.url_base}/killSession",
-                    headers={"Session-Token": self.session_token},
-                    method="GET",
-                )
-                urllib.request.urlopen(req, timeout=2)
-            except Exception:
-                pass
+                self._solicitar("killSession", timeout=2)
+            except GLPIError as error:
+                print(f"Advertencia: no se pudo cerrar la sesión de GLPI: {error}")
         self.session_token = None

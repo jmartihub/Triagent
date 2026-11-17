@@ -3,11 +3,13 @@ import json
 import sys
 from pathlib import Path
 from threading import Thread
+import urllib.error
+import urllib.request
 from urllib.request import urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from triage.glpi_client import ClienteGLPI
+from triage.glpi_client import ClienteGLPI, GLPIError
 from triage.web_dashboard import DashboardHandler, resumir_tickets
 
 
@@ -83,8 +85,47 @@ def test_endpoint_dashboard_usa_todos_los_tickets():
         servidor.server_close()
 
 
+def test_fallo_al_crear_ticket_devuelve_error_sin_identificador_simulado():
+    class ClienteFallido:
+        modo_mock = False
+
+        def crear_ticket(self, _asunto, _descripcion):
+            raise GLPIError("ERROR_NOT_ALLOWED_IP")
+
+    cliente_anterior = DashboardHandler.cliente_glpi
+    agente_anterior = DashboardHandler.agente
+    DashboardHandler.cliente_glpi = ClienteFallido()
+    DashboardHandler.agente = None
+    servidor = HTTPServer(("127.0.0.1", 0), DashboardHandler)
+    hilo = Thread(target=servidor.serve_forever, daemon=True)
+    hilo.start()
+    try:
+        solicitud = urllib.request.Request(
+            f"http://127.0.0.1:{servidor.server_port}/api/triajar",
+            data=json.dumps({"asunto": "Prueba", "descripcion": "Falla"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urlopen(solicitud)
+        except urllib.error.HTTPError as error:
+            datos = json.loads(error.read().decode())
+            assert error.code == 502
+            assert datos["mensaje"] == "ERROR_NOT_ALLOWED_IP"
+            assert "id_ticket" not in datos
+        else:
+            raise AssertionError("Expected the GLPI failure to be returned")
+    finally:
+        servidor.shutdown()
+        hilo.join()
+        servidor.server_close()
+        DashboardHandler.cliente_glpi = cliente_anterior
+        DashboardHandler.agente = agente_anterior
+
+
 if __name__ == "__main__":
     test_resumen_tickets_y_cumplimiento_sla()
     test_resumen_sin_tickets_o_datos_de_sla()
     test_endpoint_dashboard_usa_todos_los_tickets()
+    test_fallo_al_crear_ticket_devuelve_error_sin_identificador_simulado()
     print("dashboard ok")

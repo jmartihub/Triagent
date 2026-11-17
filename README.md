@@ -19,7 +19,7 @@ python main.py demo
 # 3. Probar en vivo en modo interactivo (redacta cualquier ticket por teclado)
 python main.py interactivo
 
-# 4. Iniciar el dashboard web (simulador, cola GLPI y métricas)
+# 4. Iniciar el dashboard web conectado a GLPI (simulador, cola y métricas)
 python main.py web
 
 # 5. Entrenar y evaluar todos los modelos (ML clásico, Deep Learning, Regresión SLA)
@@ -32,6 +32,8 @@ python tests/test_agent_full.py
 python tests/test_clustering_cases.py
 python tests/test_dashboard.py
 python tests/test_priority_cases.py
+python tests/test_glpi_client.py
+python tests/test_main.py
 ```
 
 El resumen del dashboard se calcula con los últimos 1.000 tickets consultados. El cumplimiento de SLA se muestra solo cuando GLPI entrega tanto la fecha límite como la fecha de resolución; si esos datos no existen, se indica como no disponible.
@@ -131,10 +133,35 @@ Otros comandos individuales:
 
 ## 🐳 Despliegue de GLPI con Docker
 
-Para correr una instancia local de GLPI conectada a MariaDB:
+`python main.py web` inicia automáticamente los servicios de GLPI con Docker Compose, espera a que el puerto local responda y después conecta el dashboard. Docker Engine/Desktop debe estar abierto.
+
+También se pueden iniciar los servicios por separado:
 
 ```bash
 docker compose -f docker/docker-compose.yml up -d
 ```
 - GLPI Web: `http://localhost:8080` (credenciales iniciales: `glpi` / `glpi`)
-- API REST: `http://localhost:8080/apirest.php`
+- API REST legacy: `http://localhost:8080/apirest.php`
+
+La instalación de GLPI y la configuración de su API se hacen una sola vez y permanecen en los volúmenes de Docker. **No uses `docker compose down -v`** si quieres conservarlas.
+
+1. En la primera ejecución, completa el instalador web. Para la conexión a MariaDB usa servidor `mariadb`, base de datos `glpi_db`, usuario `glpi_user` y contraseña `glpi_secure_password`.
+2. En GLPI, activa la **API legacy** en **Configuración → General → API**.
+3. En esa configuración, crea y activa un cliente API que permita la IP de origen del agente. Si GLPI muestra `ERROR_NOT_ALLOWED_IP`, autoriza la IP indicada en el error. Copia el **App-Token** de este cliente.
+4. En las preferencias del usuario de GLPI, genera o copia el **User-Token** de API. Si el inicio con contraseña está deshabilitado, este token de usuario es necesario además del App-Token.
+5. Crea el archivo local de configuración:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   En `.env`, reemplaza `GLPI_APP_TOKEN` por el token del cliente API y `GLPI_USER_TOKEN` por el token del perfil de usuario. Ambos valores van sin comillas; también se aceptan comillas simples o dobles. El archivo está excluido de Git; no compartas ni confirmes su contenido.
+6. Después de esa configuración inicial, basta con iniciar el dashboard desde la raíz del proyecto:
+
+   ```bash
+   python main.py web
+   ```
+
+Este comando también levanta los contenedores si están detenidos; no inicia Docker Engine/Desktop por sí mismo.
+
+El dashboard lee `.env` automáticamente; también respeta variables de entorno que ya estén definidas en la terminal. Si `GLPI_USER_TOKEN` está configurado, se usa para autenticar en lugar de usuario/contraseña; si no, se usa autenticación Basic. El App-Token se envía en ambos casos. El servidor no inicia en modo simulado si falla la conexión: muestra el error de GLPI para que puedas corregir la configuración. Los tests usan el mock solo cuando lo solicitan explícitamente.

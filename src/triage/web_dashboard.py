@@ -20,13 +20,12 @@ import os
 from pathlib import Path
 import sys
 import urllib.parse
-import urllib.request
 
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ / "src"))
 
 from triage.agent import AgenteTriaje
-from triage.glpi_client import ClienteGLPI
+from triage.glpi_client import ClienteGLPI, GLPIError
 
 
 URGENCIAS_GLPI = {
@@ -549,8 +548,9 @@ HTML_INDEX = """<!DOCTYPE html>
 
     async function obtenerJSON(url, opciones) {
       const resp = await fetch(url, opciones);
-      if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
-      return resp.json();
+      const datos = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(datos.mensaje || datos.error || `Error HTTP ${resp.status}`);
+      return datos;
     }
 
     function cambiarPestana(nombre) {
@@ -584,9 +584,11 @@ HTML_INDEX = """<!DOCTYPE html>
         document.getElementById('count-tickets').innerText = ticketsCargados.length;
         renderizarTickets();
       } catch (err) {
-        label.innerText = 'No fue posible cargar las métricas';
-        document.getElementById('glpi-status').innerText = 'GLPI: Sin datos';
-        document.getElementById('glpi-status').className = 'px-2.5 py-1 text-xs rounded bg-slate-900 text-rose-400 border border-rose-800 font-mono';
+        label.innerText = `Error al consultar GLPI: ${err.message}`;
+        const estado = document.getElementById('glpi-status');
+        estado.innerText = 'GLPI: Error';
+        estado.title = err.message;
+        estado.className = 'px-2.5 py-1 text-xs rounded bg-slate-900 text-rose-400 border border-rose-800 font-mono';
       }
     }
 
@@ -631,12 +633,12 @@ HTML_INDEX = """<!DOCTYPE html>
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
-        const data = await resp.json();
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.mensaje || data.glpi_error || data.error || `Error HTTP ${resp.status}`);
         renderizarResultado(data);
         await cargarMetricasYCola();
       } catch (err) {
-        alert('Error al conectar con el servidor: ' + err);
+        alert('No se pudo procesar el ticket: ' + err.message);
       } finally {
         btn.disabled = false;
         btn.innerText = 'Procesar y Enviar a GLPI';
@@ -703,7 +705,7 @@ HTML_INDEX = """<!DOCTYPE html>
       document.getElementById('res-respuesta').innerText = d.respuesta_preliminar;
       document.getElementById('sync-glpi-msg').innerText = d.glpi_sincronizado
         ? `Sincronizado con GLPI (ID: #${d.id_ticket})`
-        : 'Ticket procesado, pero no se pudo sincronizar con GLPI';
+        : (d.glpi_error || 'Ticket procesado, pero no se pudo sincronizar con GLPI');
     }
 
     function filtrarTickets(filtro) {
@@ -854,7 +856,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
         if url.path == "/api/dashboard":
-            tickets = self.obtener_tickets_dashboard()
+            try:
+                tickets = self.obtener_tickets_dashboard()
+            except GLPIError as error:
+                self.enviar_json({"error": str(error), "glpi_mock": False}, status=502)
+                return
             self.enviar_json({
                 "tickets": tickets,
                 "metricas": resumir_tickets(tickets),
@@ -863,7 +869,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
         if url.path == "/api/tickets":
-            self.enviar_json(self.obtener_tickets_dashboard())
+            try:
+                self.enviar_json(self.obtener_tickets_dashboard())
+            except GLPIError as error:
+                self.enviar_json({"error": str(error)}, status=502)
             return
 
         if url.path == "/api/ontologia":
@@ -901,12 +910,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self.send_error(400, "Formulario y apoyo deben ser texto")
                 return
 
-            id_glpi = None
-            if self.cliente_glpi:
+            if not self.cliente_glpi:
+                self.enviar_json(
+                    {"ok": False, "mensaje": "No hay un cliente de GLPI configurado."},
+                    status=503,
+                )
+                return
+            try:
                 id_glpi = self.cliente_glpi.crear_ticket(asunto, descripcion)
+            except GLPIError as error:
+                self.enviar_json({"ok": False, "mensaje": str(error)}, status=502)
+                return
 
             ticket_sim = {
-                "id": str(id_glpi or f"WEB_{int(datetime.now().timestamp())}"),
+                "id": str(id_glpi),
                 "formulario_elegido": form,
                 "apoyo": apoyo,
                 "asunto": asunto,
@@ -916,8 +933,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
             decision = self.agente.procesar_ticket(ticket_sim)
 
-            glpi_sincronizado = False
-            if self.cliente_glpi and id_glpi:
+            try:
                 ticket_actualizado = self.cliente_glpi.actualizar_ticket(
                     id_ticket=id_glpi,
                     urgencia_nombre=decision.urgencia_final,
@@ -928,10 +944,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     id_ticket=id_glpi,
                     respuesta_texto=decision.respuesta_preliminar,
                 )
-                glpi_sincronizado = ticket_actualizado and respuesta_registrada
+            except GLPIError as error:
+                res = asdict(decision)
+                res["id_ticket"] = id_glpi
+                res["glpi_sincronizado"] = False
+                res["glpi_error"] = (
+                    f"GLPI creó el ticket #{id_glpi}, pero falló su actualización: {error}"
+                )
+                self.enviar_json(res, status=502)
+                return
 
             res = asdict(decision)
-            res["glpi_sincronizado"] = glpi_sincronizado
+            res["id_ticket"] = id_glpi
+            res["glpi_sincronizado"] = ticket_actualizado and respuesta_registrada
             self.enviar_json(res)
             return
 
@@ -950,16 +975,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 desc = tk.get("descripcion", "")
             elif self.cliente_glpi and self.cliente_glpi.session_token:
                 try:
-                    req = urllib.request.Request(
-                        f"{self.cliente_glpi.url_base}/Ticket/{id_t}",
-                        headers={"Session-Token": self.cliente_glpi.session_token},
+                    glpi_tk = self.cliente_glpi.obtener_ticket(int(id_t))
+                    asunto = glpi_tk.get("name", "")
+                    desc = glpi_tk.get("content", "")
+                except (ValueError, GLPIError) as error:
+                    self.enviar_json(
+                        {"ok": False, "mensaje": f"No se pudo consultar el ticket en GLPI: {error}"},
+                        status=502,
                     )
-                    with urllib.request.urlopen(req, timeout=3) as r:
-                        glpi_tk = json.loads(r.read().decode())
-                        asunto = glpi_tk.get("name", "")
-                        desc = glpi_tk.get("content", "")
-                except (OSError, json.JSONDecodeError):
-                    self.enviar_json({"ok": False, "mensaje": "No se pudo consultar el ticket en GLPI."})
                     return
 
             self.agente.memoria.registrar_feedback_humano(
@@ -975,9 +998,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         self.send_error(404, "Not Found")
 
-    def enviar_json(self, obj):
+    def enviar_json(self, obj, status: int = 200):
         data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
@@ -987,8 +1010,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
 def iniciar_servidor(puerto: int = 5000):
     agente = AgenteTriaje(usar_deep_learning=True)
     cliente_glpi = ClienteGLPI(modo_mock=False)
-    conectado = cliente_glpi.conectar()
-    modo_str = "GLPI Docker Real (http://localhost:8080)" if conectado and not cliente_glpi.modo_mock else "Modo Simulado / Mock"
+    try:
+        cliente_glpi.conectar()
+    except GLPIError as error:
+        raise SystemExit(
+            "No se pudo conectar con GLPI. Revisa que Docker esté activo, "
+            f"la API legacy esté habilitada y el cliente/API tenga permiso para esta IP.\nDetalle: {error}"
+        ) from error
 
     DashboardHandler.agente = agente
     DashboardHandler.cliente_glpi = cliente_glpi
@@ -998,7 +1026,7 @@ def iniciar_servidor(puerto: int = 5000):
     print(" PANEL WEB DEL AGENTE DE TRIAJE INICIADO CON EXITO ".center(80))
     print("=" * 80)
     print(f"  URL del Dashboard:    http://localhost:{puerto}")
-    print(f"  Conexion GLPI:        {modo_str}")
+    print("  Conexion GLPI:        Conectado (API legacy)")
     print("  Panel institucional sin gradientes ni emojis.")
     print("  Presiona Ctrl+C para detener el servidor.")
     print("=" * 80 + "\n")

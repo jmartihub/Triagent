@@ -12,8 +12,33 @@ Comandos disponibles:
 """
 
 import os
+import socket
+import subprocess
 import sys
+import time
 from pathlib import Path
+
+
+def cargar_entorno_local(archivo=None):
+    archivo = archivo or Path(__file__).resolve().parent / ".env"
+    if not archivo.exists():
+        return
+
+    for numero, linea in enumerate(archivo.read_text(encoding="utf-8").splitlines(), start=1):
+        linea = linea.strip()
+        if not linea or linea.startswith("#"):
+            continue
+        clave, separador, valor = linea.partition("=")
+        clave = clave.strip()
+        if not separador or not clave:
+            raise SystemExit(f"Formato inválido en {archivo}, línea {numero}; se esperaba CLAVE=valor.")
+        valor = valor.strip()
+        if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in ("'", '"'):
+            valor = valor[1:-1]
+        os.environ.setdefault(clave, valor)
+
+
+cargar_entorno_local()
 
 # Si se ejecuta con el python global del sistema, re-ejecutar automáticamente con .venv
 venv_python = Path(__file__).resolve().parent / ".venv" / "bin" / "python"
@@ -21,6 +46,45 @@ if venv_python.exists() and sys.executable != str(venv_python) and "VIRTUAL_ENV"
     os.execv(str(venv_python), [str(venv_python)] + sys.argv)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+
+def iniciar_servicios_glpi():
+    raiz = Path(__file__).resolve().parent
+    compose = raiz / "docker" / "docker-compose.yml"
+    comando = ["docker", "compose", "-f", str(compose), "up", "-d"]
+
+    try:
+        subprocess.run(
+            comando,
+            cwd=raiz,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except FileNotFoundError as error:
+        raise SystemExit("No se encontró Docker. Instala Docker Desktop/Engine y vuelve a intentarlo.") from error
+    except subprocess.TimeoutExpired as error:
+        raise SystemExit("Docker Compose tardó más de 5 minutos en iniciar los servicios.") from error
+    except subprocess.CalledProcessError as error:
+        detalle = (error.stderr or error.stdout).strip()
+        raise SystemExit(
+            "No se pudieron iniciar los servicios de GLPI con Docker Compose."
+            + (f"\nDetalle: {detalle}" if detalle else "")
+        ) from error
+
+    print("Servicios Docker de GLPI iniciados; esperando a que responda en localhost:8080...")
+    for _ in range(120):
+        try:
+            with socket.create_connection(("127.0.0.1", 8080), timeout=1):
+                return
+        except OSError:
+            time.sleep(1)
+
+    raise SystemExit(
+        "Los contenedores se iniciaron, pero GLPI no respondió en http://localhost:8080 "
+        "después de 120 segundos. Revisa `docker compose -f docker/docker-compose.yml logs glpi mariadb`."
+    )
 
 
 def main():
@@ -38,6 +102,7 @@ def main():
         return
 
     if comando in ("web", "dashboard", "front"):
+        iniciar_servicios_glpi()
         from triage import web_dashboard
         puerto = int(sys.argv[2]) if len(sys.argv) > 2 else 5000
         web_dashboard.iniciar_servidor(puerto)

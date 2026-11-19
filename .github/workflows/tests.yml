@@ -19,5 +19,5 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-lock.txt
       # Versiones exactas y hashes verificados (requirements-lock.txt); solo wheels, sin scripts de instalación.
-      - run: pip install --only-binary :all: --require-hashes -r requirements-lock.txt
+      - run: pip install --only-binary ":all:" --require-hashes -r requirements-lock.txt
       - run: pytest -q

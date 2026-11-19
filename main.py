@@ -5,6 +5,7 @@ Comandos disponibles:
     python main.py demo         # Ejecuta la demostración guiada por consola
     python main.py interactivo  # Modo interactivo en consola: ingresa tickets por teclado
     python main.py deep         # Entrena y evalúa la variante de Deep Learning (MLP)
+    python main.py factores     # Entrena un clasificador por factor de la rúbrica
     python main.py sla          # Entrena y evalúa los modelos de regresión para SLA
     python main.py evaluar      # Compara modelos, reglas y agente completo en todos los conjuntos
     python main.py generate     # Genera el dataset sintético con ruido
@@ -73,7 +74,7 @@ COMANDOS = {
     nombre: nombre
     for nombre in (
         "demo", "interactivo", "interactive", "web", "dashboard", "front",
-        "generate", "train", "deep", "sla", "all", "evaluar",
+        "generate", "train", "deep", "factores", "sla", "all", "evaluar",
     )
 }
 
@@ -166,6 +167,10 @@ def main():
         from triage import deep_model
         deep_model.main()
 
+    if comando in ("factores", "all"):
+        from triage import factor_model
+        factor_model.main()
+
     if comando in ("sla", "all"):
         from triage import sla_regression
         sla_regression.main()
@@ -174,7 +179,7 @@ def main():
         from triage import evaluate
         evaluate.main()
 
-    if comando not in ("demo", "interactivo", "interactive", "generate", "train", "deep", "sla", "all", "evaluar"):
+    if comando not in ("demo", "interactivo", "interactive", "generate", "train", "deep", "factores", "sla", "all", "evaluar"):
         print(__doc__)
         sys.exit(1)
 

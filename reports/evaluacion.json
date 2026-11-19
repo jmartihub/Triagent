@@ -19,20 +19,42 @@
         "macro_f1": 0.5893,
         "criticos_subestimados": 0.2396
       },
+      "modelo_factores": {
+        "n": 1200,
+        "accuracy": 0.8175,
+        "macro_f1": 0.7922,
+        "criticos_subestimados": 0.0833
+      },
       "agente": {
         "n": 1200,
-        "accuracy": 0.6225,
-        "macro_f1": 0.5893,
-        "criticos_subestimados": 0.2396
+        "accuracy": 0.7333,
+        "macro_f1": 0.7118,
+        "criticos_subestimados": 0.1146
       }
     },
     "formulario_agente": 1.0,
     "factores_percepcion": {
-      "tipo": 0.9275,
-      "alcance": 0.935,
-      "bloquea": 0.8075,
-      "plazo": 0.785,
-      "alternativa": 0.8325
+      "frases": {
+        "tipo": 0.9275,
+        "alcance": 0.935,
+        "bloquea": 0.8075,
+        "plazo": 0.785,
+        "alternativa": 0.8325
+      },
+      "modelo": {
+        "tipo": 1.0,
+        "alcance": 0.955,
+        "bloquea": 0.9492,
+        "plazo": 0.9333,
+        "alternativa": 0.7833
+      },
+      "agente": {
+        "tipo": 1.0,
+        "alcance": 0.9367,
+        "bloquea": 0.8717,
+        "plazo": 0.8867,
+        "alternativa": 0.78
+      }
     }
   },
   "gold_manual": {
@@ -55,10 +77,16 @@
         "macro_f1": 1.0,
         "criticos_subestimados": 0.0
       },
+      "modelo_factores": {
+        "n": 24,
+        "accuracy": 0.625,
+        "macro_f1": 0.5812,
+        "criticos_subestimados": 0.5
+      },
       "agente": {
         "n": 24,
-        "accuracy": 1.0,
-        "macro_f1": 1.0,
+        "accuracy": 0.9167,
+        "macro_f1": 0.9188,
         "criticos_subestimados": 0.0
       }
     },
@@ -84,20 +112,42 @@
         "macro_f1": 0.4028,
         "criticos_subestimados": 0.6
       },
+      "modelo_factores": {
+        "n": 80,
+        "accuracy": 0.4625,
+        "macro_f1": 0.4166,
+        "criticos_subestimados": 0.4
+      },
       "agente": {
         "n": 80,
-        "accuracy": 0.4375,
-        "macro_f1": 0.4028,
-        "criticos_subestimados": 0.6
+        "accuracy": 0.525,
+        "macro_f1": 0.5093,
+        "criticos_subestimados": 0.3
       }
     },
     "formulario_agente": 0.9125,
     "factores_percepcion": {
-      "tipo": 0.9375,
-      "alcance": 0.8,
-      "bloquea": 0.6375,
-      "plazo": 0.7,
-      "alternativa": 0.825
+      "frases": {
+        "tipo": 0.9375,
+        "alcance": 0.8,
+        "bloquea": 0.6375,
+        "plazo": 0.7,
+        "alternativa": 0.825
+      },
+      "modelo": {
+        "tipo": 0.8875,
+        "alcance": 0.875,
+        "bloquea": 0.55,
+        "plazo": 0.6875,
+        "alternativa": 0.7625
+      },
+      "agente": {
+        "tipo": 0.8625,
+        "alcance": 0.8375,
+        "bloquea": 0.6875,
+        "plazo": 0.8,
+        "alternativa": 0.7625
+      }
     }
   }
 }

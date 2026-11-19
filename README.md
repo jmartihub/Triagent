@@ -65,9 +65,10 @@ Todos los comandos se ejecutan desde la raíz del proyecto con `python main.py <
 | `generate` | Genera `data/tickets_sinteticos.csv` (6.000 tickets). | No |
 | `train` | Entrena y evalúa el modelo clásico (TF-IDF + Regresión Logística). | No |
 | `deep` | Entrena y evalúa la red neuronal MLP. | No |
+| `factores` | Entrena un clasificador por factor de la rúbrica (`models/factores.joblib`). | No |
 | `sla` | Genera el histórico de SLA y compara modelos de regresión. | No |
 | `evaluar` | Compara modelos, reglas y agente completo en todos los conjuntos (`reports/evaluacion.json`). | No |
-| `all` | Ejecuta `generate` → `train` → `deep` → `sla` → `evaluar` en orden. | No |
+| `all` | Ejecuta `generate` → `train` → `deep` → `factores` → `sla` → `evaluar` en orden. | No |
 
 Las métricas de entrenamiento se escriben en `reports/metrics.json` y `reports/metrics_deep.json`; los modelos, en `models/*.joblib`.
 
@@ -83,9 +84,12 @@ El orquestador ([`src/triage/agent.py`](src/triage/agent.py)) sigue el ciclo de 
    ▼
  1. PERCEPCIÓN ───────────────────────────────────────────────────────────────
    • Clasificadores ML/DL → urgencia y formulario correcto + confianza.
-   • Extracción de factores desde el texto (frases de config/senales.yaml):
+   • Extracción de los factores de la rúbrica:
        tipo (falla/duda) · alcance (individual/grupo/institucional)
        bloquea (sí/no) · plazo (inmediato/cercano/ninguno) · alternativa (sí/no)
+     Un clasificador por factor lee el texto libre; si aparece una frase explícita
+     de config/senales.yaml sobre ese factor, la frase manda (en alcance y plazo
+     se toma el valor más grave entre frase y modelo).
    • Señales especiales: ticket ya resuelto, riesgo físico, navegador bloqueado en examen.
    │
    ▼
@@ -142,6 +146,7 @@ Las señales explícitas de peligro físico (por ejemplo, una extremidad atrapad
 | Técnica | Módulo | Función en el agente |
 | :--- | :--- | :--- |
 | **Aprendizaje supervisado** | [`train.py`](src/triage/train.py) | Modelo base: TF-IDF de n-gramas de palabras y caracteres + Regresión Logística balanceada. |
+| **Percepción de factores** | [`factor_model.py`](src/triage/factor_model.py) | Un clasificador TF-IDF + Logística por factor de la rúbrica; la rúbrica y el FOL deciden la urgencia con esos factores. |
 | **Deep Learning** | [`deep_model.py`](src/triage/deep_model.py) | MLP densa (128 → 64, ReLU, Adam, L2, parada temprana). Es el modelo que usa el dashboard. |
 | **Lógica de primer orden** | [`fol_rules.py`](src/triage/fol_rules.py) | Cláusulas de Horn con encadenamiento hacia adelante; actúa como red de seguridad explicable sobre el ML. |
 | **Ontología** | [`ontology.py`](src/triage/ontology.py), [`config/ontology.yaml`](config/ontology.yaml) | Plataformas → grupos resolutores → técnicos y políticas de SLA. |
@@ -175,6 +180,8 @@ Triagent/
 │   ├── sla_regression.py    # Estimación de tiempos y riesgo de SLA
 │   ├── train.py             # Modelo clásico TF-IDF + Logística
 │   ├── deep_model.py        # Red neuronal MLP
+│   ├── factor_model.py      # Un clasificador por factor de la rúbrica
+│   ├── evaluate.py          # Comparación de estrategias (python main.py evaluar)
 │   ├── generate.py          # Generador de tickets sintéticos
 │   ├── banks.py             # Bancos de frases para el generador
 │   ├── response_generator.py# Respuesta preliminar al estudiante
@@ -210,20 +217,30 @@ Más ejemplos sintéticos no garantizan más precisión: el texto proviene de pl
 
 ### Agente completo vs. componentes
 
-`python main.py evaluar` compara cuatro estrategias sobre los mismos tickets: el modelo clásico, el MLP, las **reglas solas** (rúbrica sobre los factores que detecta la percepción) y el **agente** completo (lo que usa el dashboard).
+`python main.py evaluar` compara cinco estrategias sobre los mismos tickets: el modelo clásico, el MLP, las **reglas solas** (rúbrica sobre los factores que detectan las frases de `config/senales.yaml`), los **modelos de factores** (rúbrica sobre los factores que predicen los clasificadores por factor) y el **agente** completo (lo que usa el dashboard).
 
 | Estrategia | Sintético (n=1.200) | Gold desarrollo (n=24) | Gold validación (n=80) | Críticos subestimados (validación) ↓ |
 | :--- | :---: | :---: | :---: | :---: |
 | Regresión Logística | 0.764 | 0.625 | 0.375 | 20 % |
-| Red MLP | **0.800** | 0.667 | **0.438** | 35 % |
-| Reglas solas | 0.623 | 1.000 | **0.438** | 60 % |
-| Agente completo | 0.623 | 1.000 | **0.438** | 60 % |
+| Red MLP | 0.800 | 0.667 | 0.438 | 35 % |
+| Reglas solas (frases) | 0.623 | 1.000 | 0.438 | 60 % |
+| Modelos de factores | **0.818** | 0.625 | 0.463 | 40 % |
+| **Agente completo** | 0.733 | 0.917 | **0.525** | 30 % |
 
-*Exactitud de urgencia.* Lecturas:
+*Exactitud de urgencia.* Exactitud por factor en el gold de validación:
 
-- **El agente decide igual que las reglas.** La urgencia final sale del motor FOL, que reproduce la rúbrica sobre los factores percibidos; el modelo solo influye cuando su confianza es baja.
-- **El 100 % en el gold de desarrollo es sobreajuste**: en tickets nuevos el agente baja a 44 % y deja pasar como Baja o Media el 60 % de los Críticos.
-- **El cuello de botella es la percepción.** Exactitud de los factores detectados en el gold de validación: tipo 0.94, alcance 0.80, alternativa 0.82, plazo 0.70, bloquea 0.64. Frases como "hoy cierran", "ahorita", "quedan 40 min" o "a nadie le abre" no están en `config/senales.yaml`.
+| Fuente | tipo | alcance | bloquea | plazo | alternativa |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| Frases | 0.94 | 0.80 | 0.64 | 0.70 | 0.82 |
+| Modelos de factores | 0.89 | 0.88 | 0.55 | 0.69 | 0.76 |
+| Agente (combinación) | 0.86 | 0.84 | 0.69 | 0.80 | 0.76 |
+
+Lecturas:
+
+- **El motor FOL reproduce la rúbrica**: con los mismos factores, la urgencia del agente coincide con la de la rúbrica en el 99,8 % de los tickets sintéticos. La calidad del agente depende casi por completo de detectar bien los factores.
+- **Combinar frases y modelos por factor es lo que mejor generaliza**: en el gold de validación el agente pasa de 0.438 (solo frases) a 0.525, y los Críticos que se pasan como Baja o Media bajan de 60 % a 30 %. La regla de combinación se eligió con el conjunto sintético y el gold de desarrollo, sin mirar el de validación.
+- **El 100 % de las reglas en el gold de desarrollo era sobreajuste**: las frases se escribieron mirando esos 24 tickets.
+- **El cuello de botella sigue siendo detectar el bloqueo y el plazo** en lenguaje libre. Los modelos de factores aprenden las plantillas del generador (0.95 en sintético) pero generalizan poco (0.55 en `bloquea`); el siguiente paso es dar más variedad al texto sintético de entrenamiento.
 
 ### Clasificación de urgencia (solo modelos)
 
@@ -339,6 +356,7 @@ python tests/test_clustering_cases.py # Duplicados e incidentes masivos
 python tests/test_agent_full.py       # Ciclo completo del agente + GLPI mock
 python tests/test_memoria.py          # Memoria de correcciones humanas (CBR)
 python tests/test_evaluate.py         # Evaluación y consistencia del gold de validación
+python tests/test_factores.py         # Combinación de frases y modelos por factor
 python tests/test_glpi_client.py      # Cliente de GLPI
 python tests/test_dashboard.py        # Endpoints del dashboard
 python tests/test_main.py             # Arranque y carga de .env
@@ -350,7 +368,7 @@ python tests/test_main.py             # Arranque y carga de .env
 ## Limitaciones conocidas
 
 - **Datos:** el entrenamiento es sintético y la evaluación con texto humano se limita a 104 tickets escritos por el equipo. Antes de un uso real se necesita un conjunto etiquetado de tickets reales.
-- **Rendimiento en tickets nuevos:** en el gold de validación el agente acierta el 44 % de las urgencias (ver [Evaluación experimental](#evaluación-experimental)).
+- **Rendimiento en tickets nuevos:** en el gold de validación el agente acierta el 52,5 % de las urgencias y subestima el 30 % de los Críticos (ver [Evaluación experimental](#evaluación-experimental)).
 - **Extracción de factores por palabras clave:** tipo, alcance, bloqueo, plazo y alternativa se detectan con las listas de frases de [`config/senales.yaml`](config/senales.yaml). Expresiones no contempladas pueden pasar desapercibidas; se pueden agregar frases en ese archivo sin tocar el código.
 - **Memoria de casos:** una corrección humana sobre un ticket similar (umbral 0.55) reemplaza la urgencia deducida por las reglas. Solo cuenta la corrección más reciente de cada ticket, y una urgencia Crítica nunca se rebaja automáticamente: se mantiene y se pide revisión humana.
 - **SLA:** el histórico es sintético y la carga de la cola de entrenamiento va de 1 a 44 tickets; con colas mucho mayores el modelo extrapola.

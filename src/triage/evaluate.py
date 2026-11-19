@@ -3,8 +3,10 @@
 Compara, sobre los mismos tickets, cuatro formas de decidir la urgencia:
 - modelo_clasico: TF-IDF + Regresión Logística (models/urgencia.joblib).
 - modelo_mlp: red neuronal MLP (models/urgencia_deep.joblib).
-- reglas_solas: rúbrica aplicada a los factores que extrae la percepción (config/senales.yaml).
-- agente: ciclo completo percibir -> razonar -> actuar (lo que usa el dashboard).
+- reglas_solas: rúbrica aplicada a los factores según las frases de config/senales.yaml.
+- modelo_factores: rúbrica aplicada a los factores que predicen los modelos por factor.
+- agente: ciclo completo percibir -> razonar -> actuar (lo que usa el dashboard), con
+  frases y modelos de factores combinados.
 
 Conjuntos:
 - sintetico_prueba: el mismo 20 % de prueba que usan train.py y deep_model.py.
@@ -38,7 +40,8 @@ from triage.rubric import NIVELES, Factores, urgencia  # noqa: E402
 from triage.train import SEMILLA, subestima_critica, texto_urgencia  # noqa: E402
 
 FACTORES = ("tipo", "alcance", "bloquea", "plazo", "alternativa")
-ESTRATEGIAS = ("modelo_clasico", "modelo_mlp", "reglas_solas", "agente")
+ESTRATEGIAS = ("modelo_clasico", "modelo_mlp", "reglas_solas", "modelo_factores", "agente")
+FUENTES = ("frases", "modelo", "agente")
 
 
 def _a_bool(valor) -> bool:
@@ -70,7 +73,7 @@ def metricas(y_true, y_pred) -> Dict[str, float]:
 def evaluar_conjunto(df: pd.DataFrame, agente: AgenteTriaje, modelos: Dict[str, object]) -> Dict:
     """Evalúa todas las estrategias sobre un conjunto; devuelve métricas y predicciones."""
     preds: Dict[str, List[str]] = {e: [] for e in ESTRATEGIAS}
-    factores_pred: Dict[str, List] = {f: [] for f in FACTORES}
+    factores_pred: Dict[str, Dict[str, List]] = {fuente: {f: [] for f in FACTORES} for fuente in FUENTES}
     formulario_pred: List[str] = []
 
     for nombre, modelo in modelos.items():
@@ -91,12 +94,18 @@ def evaluar_conjunto(df: pd.DataFrame, agente: AgenteTriaje, modelos: Dict[str, 
 
         preds["agente"].append(decision.urgencia_final)
         formulario_pred.append(decision.formulario_final)
-        preds["reglas_solas"].append(urgencia(Factores(
-            percepcion["tipo"], percepcion["alcance"], percepcion["bloquea"],
-            percepcion["plazo"], percepcion["alternativa"],
-        )))
-        for f in FACTORES:
-            factores_pred[f].append(percepcion[f])
+        fuentes = {
+            "frases": percepcion["factores_frases"],
+            "modelo": percepcion["factores_modelo"],
+            "agente": {f: percepcion[f] for f in FACTORES},
+        }
+        preds["reglas_solas"].append(urgencia(Factores(*(fuentes["frases"][f] for f in FACTORES))))
+        if fuentes["modelo"]:
+            preds["modelo_factores"].append(urgencia(Factores(*(fuentes["modelo"][f] for f in FACTORES))))
+        for fuente, valores in fuentes.items():
+            if valores:
+                for f in FACTORES:
+                    factores_pred[fuente][f].append(valores[f])
 
     y = df["urgencia"].tolist()
     resultado = {
@@ -105,9 +114,14 @@ def evaluar_conjunto(df: pd.DataFrame, agente: AgenteTriaje, modelos: Dict[str, 
     }
     if all(f in df.columns for f in FACTORES):
         resultado["factores_percepcion"] = {}
-        for f in FACTORES:
-            real = [_a_bool(v) for v in df[f]] if f in ("bloquea", "alternativa") else df[f].tolist()
-            resultado["factores_percepcion"][f] = round(float(accuracy_score(real, factores_pred[f])), 4)
+        for fuente in FUENTES:
+            if not factores_pred[fuente]["tipo"]:
+                continue
+            resultado["factores_percepcion"][fuente] = {}
+            for f in FACTORES:
+                real = [_a_bool(v) for v in df[f]] if f in ("bloquea", "alternativa") else df[f].tolist()
+                acc = accuracy_score(real, factores_pred[fuente][f])
+                resultado["factores_percepcion"][fuente][f] = round(float(acc), 4)
     resultado["_predicciones"] = preds
     return resultado
 
@@ -121,8 +135,10 @@ def imprimir(resultados: Dict) -> None:
             print(f"{estrategia:16s} {m['accuracy']:9.3f} {m['macro_f1']:9.3f} {m['criticos_subestimados']:17.1%}")
         print(f"Formulario correcto (agente): {r['formulario_agente']:.3f}")
         if "factores_percepcion" in r:
-            texto = "  ".join(f"{f}={v:.2f}" for f, v in r["factores_percepcion"].items())
-            print(f"Factores detectados por la percepción: {texto}")
+            print("Exactitud por factor:")
+            for fuente, valores in r["factores_percepcion"].items():
+                texto = "  ".join(f"{f}={v:.2f}" for f, v in valores.items())
+                print(f"  {fuente:8s} {texto}")
 
 
 def main():

@@ -33,6 +33,7 @@ import yaml
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ / "src"))
 
+from triage.factor_model import RUTA_MODELOS as RUTA_MODELOS_FACTORES, PercepcionFactores
 from triage.clustering import DetectorIncidentesNoSupervisado, ResultadoClustering
 from triage.fol_rules import DeduccionFOL, MotorInferenciaFOL
 from triage.ontology import AsignacionTecnica, OntologiaTI
@@ -60,6 +61,85 @@ def cargar_senales(ruta: Optional[Path] = None) -> Dict[str, tuple]:
 
 
 SENALES = cargar_senales()
+
+
+FACTORES_RUBRICA = ("tipo", "alcance", "bloquea", "plazo", "alternativa")
+ORDEN_ALCANCE = ("individual", "grupo", "institucional")
+ORDEN_PLAZO = ("ninguno", "cercano", "inmediato")
+
+
+def factores_por_frases(texto_b: str, tiene_pregunta: bool = False) -> Dict[str, Any]:
+    """Factores según las frases explícitas de config/senales.yaml.
+
+    Además de los factores devuelve "evidencia": qué grupos de frases aparecieron, para
+    distinguir "la frase dice que no" de "no hay ninguna frase".
+    """
+    evidencia = {clave: any(frase in texto_b for frase in frases) for clave, frases in SENALES.items()}
+    ya_resuelto = evidencia["incidente_resuelto"]
+
+    if ya_resuelto or ((evidencia["consulta"] or tiene_pregunta) and not evidencia["falla"]):
+        tipo = "duda"
+    else:
+        tipo = "falla"
+
+    if evidencia["alcance_institucional"]:
+        alcance = "institucional"
+    elif evidencia["alcance_grupo"]:
+        alcance = "grupo"
+    else:
+        alcance = "individual"
+
+    # Las frases que niegan el bloqueo prevalecen sobre las que lo afirman.
+    bloquea = not ya_resuelto and not evidencia["no_bloquea"] and evidencia["bloqueo"]
+
+    if ya_resuelto:
+        plazo = "ninguno"
+    elif evidencia["plazo_inmediato"]:
+        plazo = "inmediato"
+    elif evidencia["plazo_cercano"]:
+        plazo = "cercano"
+    else:
+        plazo = "ninguno"
+
+    alternativa = evidencia["con_alternativa"] and not evidencia["sin_alternativa"]
+    return {"tipo": tipo, "alcance": alcance, "bloquea": bloquea, "plazo": plazo,
+            "alternativa": alternativa, "evidencia": evidencia}
+
+
+def combinar_factores(frases: Dict[str, Any], modelo: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Combina frases explícitas y modelos por factor.
+
+    Regla: si hay una frase explícita sobre un factor, esa evidencia manda (para alcance y
+    plazo se toma el valor más grave entre frase y modelo); si no hay frase, decide el modelo.
+    Sin modelos, el resultado es el de las frases.
+    """
+    base = {f: frases[f] for f in FACTORES_RUBRICA}
+    if not modelo:
+        return base
+    ev = frases["evidencia"]
+    if ev["incidente_resuelto"]:
+        return base
+
+    def mas_grave(orden, a, b):
+        return orden[max(orden.index(a), orden.index(b))]
+
+    return {
+        "tipo": modelo["tipo"],
+        "alcance": (
+            mas_grave(ORDEN_ALCANCE, frases["alcance"], modelo["alcance"])
+            if ev["alcance_institucional"] or ev["alcance_grupo"] else modelo["alcance"]
+        ),
+        "bloquea": (
+            frases["bloquea"] if ev["no_bloquea"] or ev["bloqueo"] else modelo["bloquea"]
+        ),
+        "plazo": (
+            mas_grave(ORDEN_PLAZO, frases["plazo"], modelo["plazo"])
+            if ev["plazo_inmediato"] or ev["plazo_cercano"] else modelo["plazo"]
+        ),
+        "alternativa": (
+            frases["alternativa"] if ev["con_alternativa"] or ev["sin_alternativa"] else modelo["alternativa"]
+        ),
+    }
 
 
 def detectar_riesgo_seguridad_personal(texto: str) -> bool:
@@ -217,6 +297,10 @@ class AgenteTriaje:
 
         self.modelo_urgencia = joblib.load(ruta_urg) if ruta_urg.exists() else None
         self.modelo_formulario = joblib.load(ruta_form) if ruta_form.exists() else None
+        # Sin models/factores.joblib la percepción usa solo las frases de config/senales.yaml.
+        self.percepcion_factores = (
+            PercepcionFactores.cargar(RUTA_MODELOS_FACTORES) if RUTA_MODELOS_FACTORES.exists() else None
+        )
 
     # --- 1. PERCEPCIÓN REFINADA ---
     def percibir(self, ticket: Dict[str, Any]) -> Dict[str, Any]:
@@ -245,65 +329,32 @@ class AgenteTriaje:
             pred_form = str(clases_f[probs_f.argmax()])
             conf_form = float(probs_f.max())
 
-        # Extracción semántica refinada de factores
+        # Extracción de factores: frases explícitas (config/senales.yaml) + modelos por factor
         texto_b = limpiar_texto(f"{asunto} {descripcion}")
         riesgo_seguridad_personal = detectar_riesgo_seguridad_personal(texto_b)
-
-        def contiene(clave: str) -> bool:
-            return any(frase in texto_b for frase in SENALES[clave])
-
-        # Detección de incidente resuelto o aviso sin impacto activo
-        ya_resuelto = contiene("incidente_resuelto")
-
-        # Tipo
-        hay_senal_de_consulta = contiene("consulta") or "?" in f"{asunto} {descripcion}"
-        if ya_resuelto or (hay_senal_de_consulta and not contiene("falla")):
-            tipo = "duda"
-        else:
-            tipo = "falla"
-
-        # Alcance
-        if contiene("alcance_institucional"):
-            alcance = "institucional"
-        elif contiene("alcance_grupo"):
-            alcance = "grupo"
-        else:
-            alcance = "individual"
-
-        # Bloqueo: las frases que niegan el bloqueo prevalecen sobre las que lo afirman
-        bloquea = not ya_resuelto and not contiene("no_bloquea") and contiene("bloqueo")
-
-        # Plazo: evitar falsos positivos con adverbios "ya" en frases como "ya está bien"
-        if ya_resuelto:
-            plazo = "ninguno"
-        elif contiene("plazo_inmediato"):
-            plazo = "inmediato"
-        elif contiene("plazo_cercano"):
-            plazo = "cercano"
-        else:
-            plazo = "ninguno"
+        frases = factores_por_frases(texto_b, tiene_pregunta="?" in f"{asunto} {descripcion}")
+        modelo = (
+            {f: v for f, (v, _conf) in self.percepcion_factores.predecir(texto_urg).items()}
+            if self.percepcion_factores else None
+        )
+        factores = combinar_factores(frases, modelo)
 
         incidente_navegador_en_evaluacion = (
-            bloquea
-            and plazo == "inmediato"
-            and contiene("navegador")
-            and contiene("evaluacion")
+            factores["bloquea"]
+            and factores["plazo"] == "inmediato"
+            and frases["evidencia"]["navegador"]
+            and frases["evidencia"]["evaluacion"]
         )
-
-        # Alternativa
-        alternativa = contiene("con_alternativa") and not contiene("sin_alternativa")
 
         return {
             "pred_urg": pred_urg,
             "conf_urg": conf_urg,
             "pred_form": pred_form,
             "conf_form": conf_form,
-            "tipo": tipo,
-            "alcance": alcance,
-            "bloquea": bloquea,
-            "plazo": plazo,
-            "alternativa": alternativa,
-            "ya_resuelto": ya_resuelto,
+            **factores,
+            "factores_frases": {f: frases[f] for f in FACTORES_RUBRICA},
+            "factores_modelo": modelo,
+            "ya_resuelto": frases["evidencia"]["incidente_resuelto"],
             "riesgo_seguridad_personal": riesgo_seguridad_personal,
             "incidente_navegador_en_evaluacion": incidente_navegador_en_evaluacion,
         }

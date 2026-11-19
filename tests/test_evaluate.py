@@ -30,8 +30,9 @@ def test_evaluar_conjunto_reporta_todas_las_estrategias_y_factores():
         agente.memoria = MemoriaAgente(Path(tmp) / "feedback.jsonl")
         resultado = evaluar_conjunto(gold, agente, modelos={})
 
-    assert set(resultado["urgencia"]) == {"reglas_solas", "agente"}
-    assert set(resultado["factores_percepcion"]) == set(FACTORES)
+    assert set(resultado["urgencia"]) == {"reglas_solas", "modelo_factores", "agente"}
+    for fuente in ("frases", "modelo", "agente"):
+        assert set(resultado["factores_percepcion"][fuente]) == set(FACTORES)
     for estrategia in ("reglas_solas", "agente"):
         assert resultado["urgencia"][estrategia]["n"] == 8
         assert len(resultado["_predicciones"][estrategia]) == 8

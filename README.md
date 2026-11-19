@@ -43,7 +43,11 @@ python tests/test_main.py
 
 El dashboard ofrece navegación lateral, resumen de métricas y actividad reciente, simulador de solicitudes, cola de GLPI y catálogo de especialistas. El resumen considera hasta 1.000 tickets recientes. El indicador de SLA se calcula únicamente cuando GLPI proporciona tanto la fecha límite como la fecha de resolución. El panel ofrece modos claro y oscuro, conserva la preferencia de tema y adapta la interfaz a pantallas pequeñas.
 
-La asignación de prioridad considera señales de interrupción, diferencia consultas de fallas y distingue fechas futuras de actividades inmediatas. Una falla grupal bloqueante con alternativa temporal se clasifica como Alta; sin alternativa, como Crítica. `tests/test_priority_cases.py` compara las reglas con las 24 muestras de `data/gold_manual.csv`. Esta evaluación mide ese conjunto y no garantiza el mismo rendimiento con tickets reales.
+El generador crea por defecto 6.000 tickets sintéticos e incluye variaciones de solicitudes de examen, navegador, accesos, pagos, matrícula y equipos. Más ejemplos sintéticos no garantizan más precisión: `train.py` también informa resultados sobre las 24 muestras escritas manualmente en `data/gold_manual.csv`, que siguen siendo una evaluación pequeña y no garantizan el mismo rendimiento con tickets reales.
+
+La asignación de prioridad considera señales de interrupción, diferencia consultas de fallas y distingue fechas futuras de actividades inmediatas. Una falla grupal bloqueante con alternativa temporal se clasifica como Alta; sin alternativa, como Crítica. `tests/test_priority_cases.py` compara las reglas con las 24 muestras de `data/gold_manual.csv`.
+
+Las señales explícitas de peligro físico (por ejemplo, una extremidad atrapada o dificultad para respirar) activan prioridad Crítica, revisión humana y una respuesta que indica pedir ayuda presencial inmediata, incluso si el ticket es duplicado. El ticket y su SLA no sustituyen los servicios locales de emergencia.
 
 Comandos de entrenamiento individuales:
 
@@ -127,12 +131,12 @@ Comandos de entrenamiento individuales:
 
 | Modelo | Conjunto | Exactitud | Macro-F1 | Casos críticos subestimados |
 | :--- | :--- | :--- | :--- | :--- |
-| **Regresión Logística (TF-IDF)** | Sintético (Test) | 0.73 | 0.70 | 14.7% |
-| **Deep Learning (Red MLP)** | Sintético (Test) | **0.80** | **0.76** | **13.1%** |
-| **Regresión Logística (TF-IDF)** | Gold Manual (24 tickets) | 0.50 | 0.46 | 33.3% |
-| **Deep Learning (Red MLP)** | Gold Manual (24 tickets) | **0.54** | **0.50** | 66.7% (ML solo) $\to$ **0.0% con Red FOL** |
+| **Regresión Logística (TF-IDF)** | Sintético (Test, n=1.200) | 0.7642 | 0.7219 | 6.25% |
+| **Deep Learning (Red MLP)** | Sintético (Test, n=1.200) | **0.8000** | **0.7492** | **7.29%** |
+| **Regresión Logística (TF-IDF)** | Gold Manual (24 tickets) | 0.6250 | 0.5333 | 33.33% |
+| **Deep Learning (Red MLP)** | Gold Manual (24 tickets) | **0.6667** | **0.6199** | **16.67%** |
 
-> **Hallazgo de diseño:** los modelos supervisados pueden fallar ante redacciones nuevas o informales. Las reglas FOL y la ontología complementan la predicción y ayudan a priorizar los casos bloqueantes urgentes; no sustituyen la revisión humana.
+> **Interpretación:** “Críticos subestimados” cuenta predicciones Baja o Media para tickets Críticos; no cuenta las predicciones Alta. En el conjunto manual hay solo seis tickets por clase: estos resultados son preliminares y no garantizan el rendimiento con tickets reales. Las reglas FOL complementan al modelo y el agente sigue requiriendo revisión humana.
 
 ---
 

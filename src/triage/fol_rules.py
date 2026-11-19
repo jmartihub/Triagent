@@ -397,12 +397,24 @@ class MotorInferenciaFOL:
                         if conclusion_instanciada.nombre == "EscalamientoInmediato":
                             escalamiento = True
 
+        # Si varias reglas deducen urgencias distintas, prevalece la más alta.
+        niveles_urgencia = ["Baja", "Media", "Alta", "Crítica"]
+        urgencias_deducidas = [
+            hecho.argumentos[1]
+            for hecho in base_hechos
+            if hecho.nombre == "Urgencia" and hecho.argumentos[0] == t
+        ]
+        if urgencias_deducidas:
+            urgencia_deducida = max(
+                urgencias_deducidas,
+                key=lambda nivel: niveles_urgencia.index(nivel),
+            )
+
         # Red de seguridad 2: Auditoría contra predicción de ML
         # Si ML subestima una situación que en lógica es de mayor urgencia (riesgo para SLA)
         if urgencia_predicha_ml:
-            niveles = ["Baja", "Media", "Alta", "Crítica"]
-            idx_ml = niveles.index(urgencia_predicha_ml) if urgencia_predicha_ml in niveles else 1
-            idx_fol = niveles.index(urgencia_deducida) if urgencia_deducida in niveles else 1
+            idx_ml = niveles_urgencia.index(urgencia_predicha_ml) if urgencia_predicha_ml in niveles_urgencia else 1
+            idx_fol = niveles_urgencia.index(urgencia_deducida) if urgencia_deducida in niveles_urgencia else 1
 
             if idx_fol > idx_ml:
                 seguridad_activada = True

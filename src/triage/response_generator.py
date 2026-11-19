@@ -64,9 +64,27 @@ class GeneradorRespuestaPreliminar:
         es_duplicado: bool = False,
         id_ticket_original: Optional[str] = None,
         es_incidente_masivo: bool = False,
+        riesgo_seguridad_personal: bool = False,
+        incidente_navegador_en_evaluacion: bool = False,
     ) -> str:
         lineas = []
         lineas.append(f"Hola, hemos recibido tu solicitud con identificador #{id_ticket}.")
+
+        if riesgo_seguridad_personal:
+            lineas.append(
+                "\n[ALERTA DE SEGURIDAD PERSONAL - ACCIÓN INMEDIATA]: "
+                "Este ticket describe un posible peligro físico. No esperes el SLA ni una respuesta por este medio: "
+                "avisa ahora al monitor de sala y a una persona cercana para que te ayuden presencialmente. "
+                "Si te sientes en riesgo o estás por desmayarte, pide que llamen al servicio local de emergencias. "
+                "No fuerces la mano ni manipules el equipo."
+            )
+
+        if incidente_navegador_en_evaluacion:
+            lineas.append(
+                "\n[Evaluación en curso]: Avisa ahora al docente o supervisor para que deje constancia "
+                "de la interrupción y te indique cómo continuar. No ingreses credenciales ni descargues "
+                "archivos desde esa página."
+            )
 
         # Notificación de incidente masivo conocido
         if es_incidente_masivo:
@@ -105,12 +123,23 @@ class GeneradorRespuestaPreliminar:
 
         # Recomendación de autoservicio
         guia = GUIAS_AUTOSERVICIO.get(plataforma_id)
-        if guia:
+        if guia and not riesgo_seguridad_personal and not incidente_navegador_en_evaluacion:
             lineas.append(f"\n{guia}")
 
-        lineas.append(
-            "\nEl especialista asignado revisará tu caso y te responderá por este medio. "
-            "Mesa de Ayuda de Tecnologías de la Información."
-        )
+        if riesgo_seguridad_personal:
+            lineas.append(
+                "\nLa atención por este ticket no sustituye la ayuda presencial inmediata. "
+                "Mesa de Ayuda de Tecnologías de la Información."
+            )
+        elif incidente_navegador_en_evaluacion:
+            lineas.append(
+                "\nEl equipo de TI también revisará el ticket; no esperes esa respuesta para avisar "
+                "al docente o supervisor. Mesa de Ayuda de Tecnologías de la Información."
+            )
+        else:
+            lineas.append(
+                "\nEl especialista asignado revisará tu caso y te responderá por este medio. "
+                "Mesa de Ayuda de Tecnologías de la Información."
+            )
 
         return "\n".join(lineas)

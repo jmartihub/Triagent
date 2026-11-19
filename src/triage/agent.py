@@ -45,6 +45,19 @@ def limpiar_texto(texto: str) -> str:
     return "".join(c for c in norm if unicodedata.category(c) != "Mn").lower()
 
 
+def detectar_riesgo_seguridad_personal(texto: str) -> bool:
+    """Detecta expresiones explícitas de peligro físico que requieren atención inmediata."""
+    senales_urgentes = (
+        "mano atrapada", "mano atorada", "dedo atrapado", "dedos atrapados",
+        "brazo atrapado", "brazo atorado", "pierna atrapada", "pierna atorada",
+        "no puedo sacar la mano", "no puedo sacar el brazo",
+        "me voy a desmayar", "me estoy desmayando", "creo que me desmayo",
+        "no puedo respirar", "dificultad para respirar", "dolor en el pecho",
+        "sangrado abundante", "convulsionando", "perdi el conocimiento",
+    )
+    return any(senal in texto for senal in senales_urgentes)
+
+
 @dataclass
 class DecisionAgente:
     id_ticket: str
@@ -214,6 +227,7 @@ class AgenteTriaje:
 
         # Extracción semántica refinada de factores
         texto_b = limpiar_texto(f"{asunto} {descripcion}")
+        riesgo_seguridad_personal = detectar_riesgo_seguridad_personal(texto_b)
 
         # Detección de incidente resuelto o aviso sin impacto activo
         frases_resueltas = [
@@ -239,6 +253,10 @@ class AgenteTriaje:
             "no tengo acceso", "no abre", "se congela", "pantalla negra", "pantallazo",
             "se cierra", "no me deja", "no puedo ingresar", "no conecta", "sin internet",
             "sin conexion", "dañado", "interrupcion", "lentitud extrema", "no se puede",
+            "no puedo salir", "no puedo cerrar", "no puedo volver al examen",
+            "sitio sospechoso", "sitio extraño", "pagina extraña", "pagina sospechosa",
+            "me redirige", "ventanas emergentes", "pop ups", "navegador bloqueado",
+            "atrapado en paginas", "atrapado en una pagina",
             "no puedo pagar", "no puedo enviar", "no puedo usar",
             "no puedo hacer", "no enciende", "no encienden", "no hay wifi",
             "sin wifi", "no hay internet", "restablecimiento no me llega",
@@ -290,6 +308,9 @@ class AgenteTriaje:
             "no me deja pagar", "no puedo enviar", "no puedo matricular", "cuenta suspendida",
             "no carga el examen", "no abre el examen", "se queda en blanco", "clave incorrecta",
             "no me deja", "no abre", "no carga", "no inicia", "no funciona", "no responde",
+            "no puedo salir", "no puedo cerrar la pagina", "no puedo cerrar el navegador",
+            "no puedo volver al examen", "atrapado en paginas", "atrapado en una pagina",
+            "navegador bloqueado", "no responde el navegador", "me redirige una y otra vez",
             "no conecta", "no me deja usar", "no puedo usar", "no puedo conectarme",
             "no me deja conectarme", "no hay wifi", "sin wifi",
             "no hay internet", "nadie puede conectarse", "se cerro el programa",
@@ -319,6 +340,8 @@ class AgenteTriaje:
             "vence en una hora", "vence en 30 minutos", "vence en 15 minutos",
             "vence en 10 minutos",
             "en medio de un parcial", "en medio de un examen", "examen en curso",
+            "estoy presentando un examen", "estoy haciendo un examen ahora",
+            "mi examen esta en curso", "durante el parcial",
             "parcial en curso", "evaluacion en curso", "sustentacion en curso",
             "parcial ahora", "examen ahora", "empieza en este momento"
         ]):
@@ -333,6 +356,18 @@ class AgenteTriaje:
             plazo = "cercano"
         else:
             plazo = "ninguno"
+
+        senales_navegador = (
+            "navegador", "sitio sospechoso", "sitio extraño", "pagina extraña",
+            "pagina sospechosa", "atrapado en paginas", "atrapado en una pagina",
+            "me redirige", "ventanas emergentes", "pop ups",
+        )
+        incidente_navegador_en_evaluacion = (
+            bloquea
+            and plazo == "inmediato"
+            and any(senal in texto_b for senal in senales_navegador)
+            and any(senal in texto_b for senal in ("examen", "parcial", "evaluacion", "sustentacion"))
+        )
 
         # Alternativa
         tiene_alt = any(w in texto_b for w in [
@@ -360,6 +395,8 @@ class AgenteTriaje:
             "plazo": plazo,
             "alternativa": alternativa,
             "ya_resuelto": ya_resuelto,
+            "riesgo_seguridad_personal": riesgo_seguridad_personal,
+            "incidente_navegador_en_evaluacion": incidente_navegador_en_evaluacion,
         }
 
     # --- 2. RAZONAMIENTO Y APRENDIZAJE ACTIVO ---
@@ -397,6 +434,34 @@ class AgenteTriaje:
                 f"[APRENDIZAJE HUMANO] Caso similar al ticket #{caso_feedback.get('id_ticket', '?')} "
                 f"corregido previamente por el técnico a '{urgencia_final}' (Similitud: {caso_feedback.get('similitud', 0):.2f}). "
                 f"El agente adopta el aprendizaje humano."
+            )
+
+        # La seguridad física prevalece sobre ML, aprendizaje humano y deduplicación.
+        if percepciones.get("riesgo_seguridad_personal", False):
+            urgencia_final = "Crítica"
+            deduccion_fol.urgencia_deducida = "Crítica"
+            deduccion_fol.escalamiento_inmediato = True
+            deduccion_fol.requiere_revision_humana = True
+            deduccion_fol.seguridad_ml_activada = True
+            deduccion_fol.motivo_seguridad = (
+                "Señales explícitas de posible peligro físico; requiere ayuda presencial inmediata."
+            )
+            deduccion_fol.trazabilidad_deductiva.append(
+                f"[SEGURIDAD PERSONAL] Riesgo físico inmediato en el ticket {id_t}: "
+                "se fuerza urgencia Crítica, escalamiento inmediato y revisión humana."
+            )
+        elif percepciones.get("incidente_navegador_en_evaluacion", False):
+            urgencia_final = "Crítica"
+            deduccion_fol.urgencia_deducida = "Crítica"
+            deduccion_fol.escalamiento_inmediato = True
+            deduccion_fol.requiere_revision_humana = True
+            deduccion_fol.seguridad_ml_activada = True
+            deduccion_fol.motivo_seguridad = (
+                "El navegador impide continuar una evaluación en curso; requiere atención prioritaria."
+            )
+            deduccion_fol.trazabilidad_deductiva.append(
+                f"[EVALUACIÓN EN CURSO] Bloqueo del navegador en el ticket {id_t}: "
+                "se fuerza urgencia Crítica, escalamiento inmediato y revisión humana."
             )
 
         # C. Detección de formulario erróneo (umbral >= 0.60)
@@ -497,6 +562,10 @@ class AgenteTriaje:
             es_duplicado=clust.es_duplicado,
             id_ticket_original=clust.ticket_original_id,
             es_incidente_masivo=clust.es_incidente_masivo,
+            riesgo_seguridad_personal=percepciones.get("riesgo_seguridad_personal", False),
+            incidente_navegador_en_evaluacion=percepciones.get(
+                "incidente_navegador_en_evaluacion", False
+            ),
         )
 
         decision = DecisionAgente(

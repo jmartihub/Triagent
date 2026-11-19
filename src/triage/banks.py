@@ -19,6 +19,8 @@ SINTOMAS = {
             "Teams se cierra solo cada vez que abro la cámara",
             "no puedo subir mi tarea en Teams, el archivo se queda cargando y da error",
             "en Teams no me aparecen mis clases ni mis equipos",
+            "al abrir el enlace de la clase aparece una página que no reconozco",
+            "durante una reunión de Teams la imagen se congela por momentos",
         ],
         "duda": [
             "quisiera saber cómo instalar Teams con mi cuenta institucional",
@@ -31,6 +33,8 @@ SINTOMAS = {
             "la red de la universidad está muy lenta y se cae constantemente",
             "el internet de la sala aparece conectado pero no carga ninguna página",
             "no logro conectarme a la red de estudiantes con mi usuario",
+            "al conectarme al portal de la universidad varias páginas cargan de forma incompleta",
+            "el portal de la red muestra una página de inicio que no reconozco",
         ],
         "duda": [
             "quisiera saber cuál es la red wifi para estudiantes y cómo conectarme",
@@ -43,6 +47,8 @@ SINTOMAS = {
             "Banner me sale en blanco después de iniciar sesión",
             "el portal de Banner da error cuando intento consultar mi horario",
             "no me carga la opción de inscripción de materias en Banner",
+            "al abrir el enlace de Banner el navegador muestra una página que no reconozco",
+            "la página de la evaluación tarda en cargar por momentos",
         ],
         "duda": [
             "no encuentro dónde ver mi horario en Banner",
@@ -55,6 +61,8 @@ SINTOMAS = {
             "mi correo institucional no recibe los mensajes de los profesores",
             "el correo me dice que mi buzón está lleno y no puedo enviar nada",
             "no puedo enviar archivos adjuntos desde mi correo institucional",
+            "recibí un enlace sospechoso que pide iniciar sesión con mi cuenta universitaria",
+            "aparecieron mensajes enviados desde mi correo que yo no escribí",
         ],
         "duda": [
             "quisiera saber cómo configurar mi correo institucional en el celular",
@@ -79,6 +87,8 @@ SINTOMAS = {
             "mi usuario aparece bloqueado y no puedo entrar a ninguna plataforma",
             "no me carga el aula virtual con mi usuario",
             "me pide verificación y el código nunca me llega",
+            "después de abrir un enlace desconocido el navegador empezó a mostrar avisos que no reconozco",
+            "algunas páginas se abren solas cuando intento ingresar al portal de clases",
         ],
         "duda": [
             "quisiera saber cómo cambiar mi contraseña institucional",
@@ -91,6 +101,9 @@ SINTOMAS = {
             "me pide una licencia para usar el software de diseño y no me deja continuar",
             "no tengo permisos para instalar el programa que pidió el profesor",
             "el software de simulación se cierra solo al abrir mi proyecto",
+            "el navegador del computador abre páginas que no solicité",
+            "una ventana inesperada aparece a pantalla completa al iniciar el navegador",
+            "después de instalar una extensión el navegador muestra avisos inesperados",
         ],
         "duda": [
             "quisiera saber qué programas tienen instalados en la sala de cómputo",
@@ -103,6 +116,8 @@ SINTOMAS = {
             "el computador que usé se congela y se reinicia solo",
             "el teclado y el mouse del equipo no responden",
             "la pantalla del computador se ve con rayas y no se puede trabajar",
+            "el navegador del equipo se quedó congelado al abrir un enlace externo",
+            "aparecen avisos inesperados en el navegador del equipo",
         ],
         "duda": [
             "se puede imprimir desde los computadores de la sala",
@@ -115,6 +130,8 @@ SINTOMAS = {
             "la sala virtual no me deja conectarme al escritorio remoto",
             "al iniciar sesión en la sala virtual me dice que no hay equipos disponibles",
             "la sala virtual se desconecta cada pocos minutos y pierdo mi trabajo",
+            "la pantalla del escritorio remoto se congela por momentos durante una evaluación",
+            "al abrir un enlace desde la sala virtual aparece una página que no reconozco",
         ],
         "duda": [
             "quisiera saber cómo funciona la sala virtual y en qué horarios está disponible",
@@ -127,6 +144,8 @@ SINTOMAS = {
             "la liquidación me sale con un valor que no corresponde a mi matrícula",
             "no me deja generar el comprobante de pago, la página da error",
             "mi liquidación no incluye el descuento al que tengo derecho",
+            "el portal de liquidaciones se queda en blanco después de iniciar sesión",
+            "un enlace de pago que recibí no coincide con el portal institucional",
         ],
         "duda": [
             "quisiera saber cómo se calcula mi liquidación de matrícula",
@@ -139,6 +158,7 @@ SINTOMAS = {
             "no puedo descargar el recibo de pago, el archivo sale dañado",
             "el recibo que generé tiene mis datos incorrectos",
             "pagué dos veces el mismo recibo por error",
+            "descargué un recibo desde un enlace y no aparece en el portal institucional",
         ],
         "duda": [
             "quisiera saber cuánto demora en reflejarse un pago hecho en el banco",
@@ -151,6 +171,7 @@ SINTOMAS = {
             "no me aparece la opción de pagar con tarjeta",
             "intenté pagar en el banco y dicen que el recibo no existe",
             "el corresponsal bancario no reconoce el código de barras del recibo",
+            "la página de pago me redirige a un formulario distinto al que uso normalmente",
         ],
         "duda": [
             "quisiera saber si puedo pagar la matrícula con tarjeta de crédito en cuotas",
@@ -163,6 +184,8 @@ SINTOMAS = {
             "no me aparece abierta la inscripción de materias en mi programa",
             "me aparece un cruce de horarios que no es real",
             "el sistema no me deja retirar una materia",
+            "apareció un aviso inesperado al confirmar mis materias en la inscripción",
+            "el portal cerró mi sesión durante el proceso y no sé si guardó los cambios",
         ],
         "duda": [
             "quisiera saber cuántos créditos puedo inscribir este semestre",
@@ -175,6 +198,7 @@ SINTOMAS = {
             "mi beca no aparece aplicada en la matrícula",
             "me cobran un valor adicional que no entiendo en mi estado de cuenta",
             "mi pago no se refleja y por eso no me deja matricular materias",
+            "el portal financiero muestra información distinta al comprobante que descargué",
         ],
         "duda": [
             "quisiera saber cómo ver mi estado de cuenta",
@@ -204,6 +228,9 @@ BLOQUEO = {
         "No me deja hacer absolutamente nada.",
         "Estoy completamente bloqueado.",
         "Así no puedo avanzar.",
+        "No puedo cerrar la página ni volver a la actividad.",
+        "El navegador no responde y no puedo continuar.",
+        "La página se abre de nuevo cada vez que intento cerrarla.",
     ],
     False: [
         "No es grave, igual puedo seguir trabajando.",
@@ -218,6 +245,10 @@ PLAZO = {
         "Estoy en medio de un examen.",
         "Mi clase empieza en 15 minutos.",
         "Hoy vence el plazo para este trámite.",
+        "Estoy presentando el examen ahora mismo.",
+        "El parcial está en curso y debo enviarlo antes de que cierre.",
+        "Me quedan pocos minutos para terminar la evaluación.",
+        "La sustentación ya empezó.",
     ],
     "cercano": [
         "Mañana cierra el plazo.",

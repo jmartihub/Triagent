@@ -135,7 +135,7 @@ def degradar(texto, rng):
     return texto
 
 
-def generar(n=3000, semilla=42):
+def generar(n=6000, semilla=42):
     rng = random.Random(semilla)
     apoyos_por_form = cargar_apoyos()
     claves_por_form = {
@@ -190,12 +190,12 @@ def generar(n=3000, semilla=42):
 def guardar(filas, ruta):
     ruta.parent.mkdir(parents=True, exist_ok=True)
     with ruta.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=COLUMNAS)
+        w = csv.DictWriter(fh, fieldnames=COLUMNAS, lineterminator="\n")
         w.writeheader()
         w.writerows(filas)
 
 
-def main(n=3000, semilla=42):
+def main(n=6000, semilla=42):
     filas = generar(n, semilla)
     ruta = RAIZ / "data" / "tickets_sinteticos.csv"
     guardar(filas, ruta)

@@ -58,6 +58,11 @@ class OntologiaTI:
             return "pagos_linea"
         if any(w in texto for w in ["vdi", "sala virtual", "remoto", "escritorio remoto"]):
             return "sala_virtual"
+        if any(w in texto for w in [
+            "navegador", "sitio sospechoso", "sitio extraño", "pagina extraña",
+            "pagina sospechosa", "ventanas emergentes", "pop ups", "me redirige",
+        ]):
+            return "software_salas"
         if any(w in texto for w in ["autocad", "spss", "matlab", "licencia", "software"]):
             return "software_salas"
         if any(w in texto for w in ["sala", "computador", "laboratorio", "pantalla", "teclado", "mouse", "impresora"]):

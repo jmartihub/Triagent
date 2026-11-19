@@ -112,6 +112,20 @@ def test_fol_inference():
     assert res_duda.urgencia_deducida == "Baja"
     assert "FOL-R03" in res_duda.reglas_disparadas
 
+    # Una consulta detectada en grupo no debe rebajar una regla de urgencia Alta.
+    conflicto_reglas = motor.razonar(
+        id_ticket="tk_004",
+        tipo="duda",
+        alcance="grupo",
+        bloquea=False,
+        plazo="ninguno",
+        alternativa=False,
+        confianza_ml=0.85,
+    )
+    assert conflicto_reglas.urgencia_deducida == "Alta"
+    assert "FOL-R02" in conflicto_reglas.reglas_disparadas
+    assert "FOL-R03" in conflicto_reglas.reglas_disparadas
+
     print("[OK] FOL: Inferencia deductiva, clausulas de Horn y red de seguridad correctas")
 
 

@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ / "src"))
@@ -87,8 +88,40 @@ def test_escalamiento_masivo_actualiza_sla_y_asignacion():
     print("[OK] Escalamiento masivo: SLA y enrutamiento reflejan la prioridad final")
 
 
+def test_peligro_fisico_es_critico_aunque_sea_duplicado():
+    agente = AgenteTriaje(usar_deep_learning=False)
+    ticket = {
+        "id": "EMERGENCIA_01",
+        "formulario_elegido": "Fallas Técnicas TIC",
+        "apoyo": "Funciones del computador",
+        "asunto": "Ayuda urgente en la sala",
+        "descripcion": (
+            "Solicito ayuda en la sala de informatica con el computador 09 con el siguiente problema: "
+            "Pensé que donde se ponia los discos era para calentar la mano y ahora tengo la mano atorada, "
+            "AYUDAAAAAAAAA. Me siento mal, creo que me voy a desmayar."
+        ),
+        "fecha_apertura": "2026-11-18 10:00",
+    }
+
+    with TemporaryDirectory() as temporal:
+        agente.memoria.ruta_log = Path(temporal) / "feedback.jsonl"
+        primera = agente.procesar_ticket(ticket)
+        duplicado = agente.procesar_ticket({**ticket, "id": "EMERGENCIA_02"})
+
+    assert primera.urgencia_final == "Crítica"
+    assert duplicado.es_duplicado is True
+    assert duplicado.urgencia_final == "Crítica"
+    assert duplicado.requiere_revision_humana is True
+    assert duplicado.seguridad_ml_activada is True
+    assert any("[SEGURIDAD PERSONAL]" in linea for linea in duplicado.justificacion_fol)
+    assert "No esperes el SLA" in duplicado.respuesta_preliminar
+    assert "No fuerces la mano" in duplicado.respuesta_preliminar
+    assert "reubique" not in duplicado.respuesta_preliminar
+
+
 if __name__ == "__main__":
     test_duda_reiterada_no_es_incidente_masivo()
     test_brote_fallas_requiere_minimo_tres_reportes()
     test_escalamiento_masivo_actualiza_sla_y_asignacion()
+    test_peligro_fisico_es_critico_aunque_sea_duplicado()
     print("\nTodos los tests de clustering pasaron exitosamente.")

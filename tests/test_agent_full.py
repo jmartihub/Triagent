@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -51,6 +52,34 @@ def test_deteccion_formulario_erroneo():
     print("[OK] Detección y corrección de formulario erróneo correcta")
 
 
+def test_navegador_bloqueado_durante_examen_es_critico():
+    ticket = {
+        "id": "TEST_EXAMEN_NAVEGADOR",
+        "formulario_elegido": "Fallas Técnicas TIC",
+        "apoyo": "Otra",
+        "asunto": "No puedo salir",
+        "descripcion": (
+            "Estoy en medio de un examen, abrí un sitio sospechoso y quedé atrapado en páginas "
+            "que no solicité. No puedo cerrar el navegador ni volver al examen."
+        ),
+        "fecha_apertura": "2026-11-18 10:00",
+    }
+
+    with TemporaryDirectory() as temporal:
+        for usar_deep_learning in (False, True):
+            agente = AgenteTriaje(usar_deep_learning=usar_deep_learning)
+            agente.memoria.ruta_log = Path(temporal) / f"feedback-{usar_deep_learning}.jsonl"
+            decision = agente.procesar_ticket(ticket)
+            assert decision.urgencia_final == "Crítica"
+            assert decision.tiempo_sla_horas == 2.0
+            assert decision.requiere_revision_humana is True
+            assert "Soporte de Salas de Cómputo y Hardware" in decision.grupo_asignado
+            assert any("[EVALUACIÓN EN CURSO]" in linea for linea in decision.justificacion_fol)
+            assert "Avisa ahora al docente o supervisor" in decision.respuesta_preliminar
+            assert "no esperes esa respuesta" in decision.respuesta_preliminar
+            assert "Restablecimiento institucional" not in decision.respuesta_preliminar
+
+
 def test_integracion_glpi_mock():
     cliente = ClienteGLPI(modo_mock=True)
     assert cliente.conectar() is True
@@ -75,5 +104,6 @@ def test_integracion_glpi_mock():
 if __name__ == "__main__":
     test_ciclo_completo_agente()
     test_deteccion_formulario_erroneo()
+    test_navegador_bloqueado_durante_examen_es_critico()
     test_integracion_glpi_mock()
     print("\nTodos los tests del agente pasaron exitosamente.")

@@ -39,6 +39,13 @@ def test_incidente_resuelto_ignora_el_modelo():
     print("[OK] Factores: un incidente ya resuelto no se reabre por el modelo")
 
 
+def test_alternativa_negada_no_cuenta_como_alternativa():
+    assert frases("no tengo otro computador")["evidencia"]["con_alternativa"] is False
+    assert frases("sin otro dispositivo a la mano")["evidencia"]["con_alternativa"] is False
+    assert frases("puedo usar otro computador")["evidencia"]["con_alternativa"] is True
+    print("[OK] Factores: una alternativa negada no cuenta como alternativa")
+
+
 def test_agente_usa_los_modelos_de_factores():
     agente = AgenteTriaje(usar_deep_learning=True)
     assert agente.percepcion_factores is not None
@@ -52,5 +59,6 @@ if __name__ == "__main__":
     test_frase_explicita_manda_sobre_el_modelo()
     test_alcance_y_plazo_toman_el_valor_mas_grave()
     test_incidente_resuelto_ignora_el_modelo()
+    test_alternativa_negada_no_cuenta_como_alternativa()
     test_agente_usa_los_modelos_de_factores()
     print("\nTodos los tests de factores pasaron exitosamente.")

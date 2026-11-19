@@ -192,7 +192,8 @@ Triagent/
 │   ├── tickets_sinteticos.csv   # 6.000 tickets generados
 │   ├── gold_manual.csv          # 24 tickets escritos a mano (6 por urgencia)
 │   ├── historico_sla.csv        # 3.000 registros sintéticos de resolución
-│   └── feedback_log.jsonl       # Correcciones humanas (local, no versionado)
+│   ├── feedback_log.jsonl       # Correcciones humanas (local, no versionado)
+│   └── decisiones.jsonl         # Decisiones del agente en el panel (local, no versionado)
 ├── models/                  # Modelos entrenados (.joblib)
 ├── reports/                 # Métricas de evaluación (.json)
 ├── docker/docker-compose.yml# GLPI + MariaDB
@@ -280,16 +281,21 @@ Ambos modelos obtienen 1.00 de exactitud en el conjunto sintético; en el gold d
 - El resumen considera hasta 1.000 tickets recientes.
 - El indicador de cumplimiento de SLA solo se calcula cuando GLPI proporciona la fecha límite y la fecha de resolución.
 - **Corregir** (en la cola) actualiza únicamente la urgencia del ticket en GLPI y después guarda la corrección para el aprendizaje local. No cambia el estado del ticket. Si GLPI rechaza el cambio, no se registra la corrección.
+- La columna **Agente** de la cola muestra, para los tickets que procesó el agente, si requieren revisión humana y la confianza del modelo. **Detalle** abre la decisión completa: urgencia del agente frente a la de GLPI, formulario, técnico, los cinco factores detectados y la justificación de las reglas. Las decisiones se guardan en `data/decisiones.jsonl` (no versionado), así que se conservan al reiniciar el panel.
+- El filtro **Requiere revisión** deja solo los tickets que el agente marcó para revisión humana.
+- **Correcciones de técnicos** lista el historial (vigentes, reemplazadas y anuladas). **Deshacer** devuelve el ticket a la urgencia que tenía en GLPI antes de la corrección y anula esa corrección, de modo que el agente deja de aprender de ella.
 
 Endpoints que usa el dashboard:
 
 | Método | Ruta | Descripción |
 | :--- | :--- | :--- |
-| `GET` | `/api/dashboard` | Tickets de GLPI y métricas resumidas. |
+| `GET` | `/api/dashboard` | Tickets de GLPI, métricas resumidas y decisiones del agente para esos tickets. |
 | `GET` | `/api/tickets` | Tickets de GLPI. |
 | `GET` | `/api/ontologia` | Técnicos y políticas de SLA. |
 | `POST` | `/api/triajar` | Crea el ticket en GLPI, lo procesa con el agente y escribe urgencia, técnico y respuesta preliminar. Cuerpo: `asunto`, `descripcion`, `formulario_elegido`, `apoyo`. |
 | `POST` | `/api/feedback` | Corrige la urgencia en GLPI y la guarda en la memoria. Cuerpo: `id_ticket`, `urgencia_corregida`. |
+| `POST` | `/api/feedback/deshacer` | Anula la corrección vigente de un ticket y restaura su urgencia anterior en GLPI. Cuerpo: `id_ticket`. |
+| `GET` | `/api/correcciones` | Historial de correcciones, de la más reciente a la más antigua. |
 
 > El dashboard no tiene autenticación, así que por defecto solo acepta conexiones desde el mismo equipo (`127.0.0.1`). Para abrirlo a la red local (por ejemplo, en una sustentación) define `TRIAGENT_HOST=0.0.0.0`, y hazlo solo en una red de confianza.
 
@@ -366,6 +372,7 @@ python tests/test_agent_full.py       # Ciclo completo del agente + GLPI mock
 python tests/test_memoria.py          # Memoria de correcciones humanas (CBR)
 python tests/test_evaluate.py         # Evaluación y consistencia del gold de validación
 python tests/test_factores.py         # Combinación de frases y modelos por factor
+python tests/test_correcciones.py     # Historial, deshacer y decisiones persistentes
 python tests/test_glpi_client.py      # Cliente de GLPI
 python tests/test_dashboard.py        # Endpoints del dashboard
 python tests/test_main.py             # Arranque y carga de .env

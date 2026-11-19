@@ -25,9 +25,11 @@ import urllib.parse
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ / "src"))
 
-from triage.agent import AgenteTriaje
+from triage.agent import AgenteTriaje, MemoriaAgente
 from triage.glpi_client import ClienteGLPI, GLPIError
 
+
+SIN_CLIENTE_GLPI = "No hay un cliente de GLPI configurado."
 
 URGENCIAS_GLPI = {
     1: "Baja",
@@ -143,6 +145,44 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.agente.carga_cola = sum(1 for t in tickets if _estado_ticket(t) not in (5, 6))
         return tickets
 
+    def resumen_decisiones(self, tickets):
+        """Lo que decidió el agente para los tickets de la cola que pasaron por él."""
+        historial = self.agente.memoria.historial_decisiones if self.agente else {}
+        resumen = {}
+        for ticket in tickets:
+            registro = historial.get(str(ticket.get("id")))
+            if not registro:
+                continue
+            d = registro.get("decision", {})
+            resumen[str(ticket.get("id"))] = {
+                campo: d.get(campo) for campo in (
+                    "urgencia_final", "formulario_final", "hubo_cambio_formulario", "tecnico_asignado",
+                    "requiere_revision_humana", "confianza_ml_urgencia", "seguridad_ml_activada",
+                    "aprendizaje_humano_aplicado", "es_duplicado", "es_incidente_masivo",
+                    "justificacion_fol", "factores",
+                )
+            }
+        return resumen
+
+    def listar_correcciones(self):
+        """Historial de correcciones (más recientes primero), marcando vigentes y anuladas."""
+        correcciones = self.agente.memoria.leer_correcciones() if self.agente else []
+        vigentes = self.agente.memoria.correcciones_vigentes() if self.agente else {}
+        anuladas = {c.get("corrección_anulada") for c in correcciones if c.get("anulada")}
+        historial = [
+            {
+                "timestamp": c.get("timestamp"),
+                "id_ticket": c.get("id_ticket"),
+                "asunto": c.get("asunto", ""),
+                "urgencia_anterior": c.get("urgencia_anterior"),
+                "urgencia_corregida": c.get("urgencia_corregida"),
+                "anulada": c.get("timestamp") in anuladas,
+                "vigente": vigentes.get(str(c.get("id_ticket")), {}).get("timestamp") == c.get("timestamp"),
+            }
+            for c in correcciones if not c.get("anulada")
+        ]
+        self.enviar_json({"correcciones": list(reversed(historial))[:100]})
+
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
 
@@ -162,8 +202,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.enviar_json({
                 "tickets": tickets,
                 "metricas": resumir_tickets(tickets),
+                "decisiones": self.resumen_decisiones(tickets),
                 "glpi_mock": not self.cliente_glpi or self.cliente_glpi.modo_mock,
             })
+            return
+
+        if url.path == "/api/correcciones":
+            self.listar_correcciones()
             return
 
         if url.path == "/api/tickets":
@@ -210,7 +255,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
             if not self.cliente_glpi:
                 self.enviar_json(
-                    {"ok": False, "mensaje": "No hay un cliente de GLPI configurado."},
+                    {"ok": False, "mensaje": SIN_CLIENTE_GLPI},
                     status=503,
                 )
                 return
@@ -274,7 +319,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
             if not self.cliente_glpi:
                 self.enviar_json(
-                    {"ok": False, "mensaje": "No hay un cliente de GLPI configurado."},
+                    {"ok": False, "mensaje": SIN_CLIENTE_GLPI},
                     status=503,
                 )
                 return
@@ -288,6 +333,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 formulario = None
 
             try:
+                # Se guarda la urgencia que tenía en GLPI para poder deshacer la corrección.
+                glpi_tk = self.cliente_glpi.obtener_ticket(id_glpi)
+                urgencia_anterior = _urgencia_ticket(glpi_tk)
                 if id_t in self.agente.memoria.historial_decisiones:
                     registro = self.agente.memoria.historial_decisiones[id_t]
                     tk = registro["ticket"]
@@ -295,7 +343,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     desc = tk.get("descripcion", "")
                     formulario = formulario or registro.get("decision", {}).get("formulario_final")
                 else:
-                    glpi_tk = self.cliente_glpi.obtener_ticket(id_glpi)
                     asunto = glpi_tk.get("name", "")
                     desc = glpi_tk.get("content", "")
                 self.cliente_glpi.actualizar_urgencia(id_glpi, urg_corregida)
@@ -314,6 +361,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     comentarios="Ajuste manual del tecnico desde Dashboard",
                     asunto=asunto,
                     descripcion=desc,
+                    urgencia_anterior=urgencia_anterior,
                 )
             except OSError as error:
                 self.enviar_json(
@@ -335,7 +383,45 @@ class DashboardHandler(BaseHTTPRequestHandler):
             })
             return
 
+        if url.path == "/api/feedback/deshacer":
+            self.deshacer_correccion(datos)
+            return
+
         self.send_error(404, "Not Found")
+
+    def deshacer_correccion(self, datos):
+        """Anula la corrección vigente de un ticket y devuelve su urgencia anterior en GLPI."""
+        id_t = str(datos.get("id_ticket", ""))
+        if not id_t.isdigit() or int(id_t) <= 0:
+            self.send_error(400, "El identificador del ticket debe ser un entero positivo")
+            return
+        if not self.cliente_glpi or not self.agente:
+            self.enviar_json({"ok": False, "mensaje": SIN_CLIENTE_GLPI}, status=503)
+            return
+
+        vigente = self.agente.memoria.correcciones_vigentes().get(id_t)
+        if vigente is None:
+            self.enviar_json({"ok": False, "mensaje": "El ticket no tiene una corrección vigente."}, status=404)
+            return
+
+        anterior = vigente.get("urgencia_anterior")
+        if anterior in URGENCIAS_GLPI.values():
+            try:
+                self.cliente_glpi.actualizar_urgencia(int(id_t), anterior)
+            except GLPIError as error:
+                self.enviar_json(
+                    {"ok": False, "mensaje": f"No se pudo restaurar la urgencia en GLPI: {error}"},
+                    status=502,
+                )
+                return
+
+        self.agente.memoria.anular_correccion(id_t)
+        mensaje = (
+            f"Corrección anulada y urgencia restaurada a {anterior} en GLPI."
+            if anterior in URGENCIAS_GLPI.values()
+            else "Corrección anulada. No se conocía la urgencia anterior: revisa el ticket en GLPI."
+        )
+        self.enviar_json({"ok": True, "mensaje": mensaje, "urgencia_restaurada": anterior})
 
     def enviar_json(self, obj, status: int = 200):
         data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -351,6 +437,8 @@ def iniciar_servidor(puerto: int = 5000, host: Optional[str] = None):
     # y puede modificar tickets en GLPI. TRIAGENT_HOST=0.0.0.0 lo expone a la red.
     host = host or os.getenv("TRIAGENT_HOST", "127.0.0.1")
     agente = AgenteTriaje(usar_deep_learning=True)
+    # Las decisiones se guardan en disco para que la cola las muestre tras reiniciar el panel.
+    agente.memoria = MemoriaAgente(ruta_decisiones=RAIZ / "data" / "decisiones.jsonl")
     cliente_glpi = ClienteGLPI(modo_mock=False)
     try:
         cliente_glpi.conectar()

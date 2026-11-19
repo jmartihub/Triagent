@@ -220,6 +220,13 @@
       border-radius: 0.9rem;
       box-shadow: 0 24px 70px rgba(31, 41, 55, 0.2);
     }
+    .detalle-dialog { width: min(42rem, calc(100vw - 2rem)); }
+    .detalle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.6rem; margin-top: 1rem; }
+    .detalle-dato { font-size: 0.75rem; }
+    .detalle-dato dt { color: #7a8492; }
+    .detalle-dato dd { font-weight: 600; margin-top: 0.1rem; }
+    .detalle-lista { margin-top: 0.4rem; padding-left: 1.1rem; list-style: disc; font-size: 0.72rem; line-height: 1.45; max-height: 14rem; overflow-y: auto; }
+    .theme-dark .detalle-dato dt { color: #94a3b8; }
     .feedback-dialog::backdrop { background: rgba(31, 41, 55, 0.3); backdrop-filter: blur(2px); }
     .feedback-dialog-content { padding: 1.4rem; }
     .feedback-dialog-title { color: #344054; font-size: 1.05rem; font-weight: 650; }
@@ -688,6 +695,7 @@
           <button onclick="filtrarTickets('Baja')" id="filtro-baja" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">Baja</button>
           <button onclick="filtrarTickets('Nuevo')" id="filtro-nuevo" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">Nuevos</button>
           <button onclick="filtrarTickets('En curso')" id="filtro-encurso" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">En curso</button>
+          <button onclick="filtrarTickets('revision')" id="filtro-revision" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">Requiere revisión</button>
         </div>
         <div class="w-full sm:w-64">
           <input type="text" id="busqueda-ticket" aria-label="Filtrar tickets por asunto o ID" oninput="buscarTicket()" placeholder="Filtrar por asunto, ID..." class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600 text-xs">
@@ -695,21 +703,44 @@
       </div>
 
       <div class="tickets-table-wrap overflow-x-auto rounded border border-slate-800">
-        <table class="tickets-table w-full min-w-[900px] table-fixed text-left text-xs text-slate-300">
+        <table class="tickets-table w-full min-w-[1000px] table-fixed text-left text-xs text-slate-300">
           <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
             <tr>
-              <th class="w-[8%] px-3 py-2.5">ID</th>
-              <th class="w-[29%] px-3 py-2.5">Asunto</th>
-              <th class="queue-date-column w-[17%] px-3 py-2.5">Fecha</th>
-              <th class="w-[16%] px-3 py-2.5">Estado</th>
-              <th class="w-[12%] px-3 py-2.5">Urgencia</th>
-              <th class="w-[18%] px-3 py-2.5">Feedback</th>
+              <th class="w-[7%] px-3 py-2.5">ID</th>
+              <th class="w-[25%] px-3 py-2.5">Asunto</th>
+              <th class="queue-date-column w-[15%] px-3 py-2.5">Fecha</th>
+              <th class="w-[13%] px-3 py-2.5">Estado</th>
+              <th class="w-[10%] px-3 py-2.5">Urgencia</th>
+              <th class="w-[17%] px-3 py-2.5">Agente</th>
+              <th class="w-[13%] px-3 py-2.5">Feedback</th>
             </tr>
           </thead>
           <tbody id="tabla-tickets" class="divide-y divide-slate-800">
-            <tr><td colspan="6" class="px-3 py-4 text-center text-slate-500">Cargando tickets...</td></tr>
+            <tr><td colspan="7" class="px-3 py-4 text-center text-slate-500">Cargando tickets...</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="mt-6">
+        <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">Correcciones de técnicos</h3>
+        <p class="text-xs text-slate-400 mb-3">El agente aprende de la corrección vigente de cada ticket. Deshacer restaura la urgencia anterior en GLPI.</p>
+        <div class="tickets-table-wrap overflow-x-auto rounded border border-slate-800">
+          <table class="tickets-table w-full min-w-[760px] table-fixed text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+              <tr>
+                <th class="w-[18%] px-3 py-2.5">Fecha</th>
+                <th class="w-[9%] px-3 py-2.5">Ticket</th>
+                <th class="w-[30%] px-3 py-2.5">Asunto</th>
+                <th class="w-[18%] px-3 py-2.5">Cambio</th>
+                <th class="w-[12%] px-3 py-2.5">Estado</th>
+                <th class="w-[13%] px-3 py-2.5">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-correcciones" class="divide-y divide-slate-800">
+              <tr><td colspan="6" class="px-3 py-4 text-center text-slate-500">Cargando correcciones...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -742,6 +773,21 @@
         </div>
       </form>
     </dialog>
+
+    <dialog id="detalle-dialog" class="feedback-dialog detalle-dialog" aria-labelledby="detalle-titulo">
+      <div class="feedback-dialog-content">
+        <h2 id="detalle-titulo" class="feedback-dialog-title">Decisión del agente</h2>
+        <p id="detalle-asunto" class="feedback-dialog-description"></p>
+        <dl id="detalle-datos" class="detalle-grid"></dl>
+        <h3 class="feedback-dialog-title text-sm mt-4">Factores detectados</h3>
+        <dl id="detalle-factores" class="detalle-grid"></dl>
+        <h3 class="feedback-dialog-title text-sm mt-4">Justificación</h3>
+        <ul id="detalle-justificacion" class="detalle-lista"></ul>
+        <div class="feedback-actions">
+          <button type="button" class="feedback-action feedback-action-primary" onclick="document.getElementById('detalle-dialog').close()">Cerrar</button>
+        </div>
+      </div>
+    </dialog>
       </main>
     </div>
   </div>
@@ -764,6 +810,10 @@
     let ticketsCargados = [];
     let filtroActual = 'todos';
     let ticketFeedbackActual = null;
+    let decisionesAgente = {};
+    const NOMBRES_FACTORES = {
+      tipo: 'Tipo', alcance: 'Alcance', bloquea: 'Bloquea', plazo: 'Plazo', alternativa: 'Alternativa'
+    };
 
     function aplicarTema(tema) {
       const claro = tema === 'light';
@@ -820,6 +870,7 @@
       try {
         const data = await obtenerJSON('/api/dashboard');
         ticketsCargados = data.tickets || [];
+        decisionesAgente = data.decisiones || {};
         renderizarMetricas(data.metricas);
         renderizarResumenActividad(ticketsCargados);
         document.getElementById('glpi-status').innerText = data.glpi_mock
@@ -830,6 +881,7 @@
           : 'px-2.5 py-1 text-xs rounded bg-slate-900 text-emerald-400 border border-emerald-800 font-mono';
         document.getElementById('count-tickets').innerText = ticketsCargados.length;
         renderizarTickets();
+        cargarCorrecciones();
       } catch (err) {
         label.innerText = `Error al consultar GLPI: ${err.message}`;
         const estado = document.getElementById('glpi-status');
@@ -1015,14 +1067,15 @@
         const cumpleFiltro = filtroActual === 'todos'
           || filtroActual === urgencia
           || (filtroActual === 'Nuevo' && estado === 1)
-          || (filtroActual === 'En curso' && [2, 3, 4].includes(estado));
+          || (filtroActual === 'En curso' && [2, 3, 4].includes(estado))
+          || (filtroActual === 'revision' && decisionesAgente[String(ticket.id)]?.requiere_revision_humana === true);
         const texto = `${ticket.id ?? ''} ${ticket.name ?? ''} ${ticket.content ?? ''}`.toLocaleLowerCase();
         return cumpleFiltro && texto.includes(consulta);
       });
 
       document.getElementById('count-tickets').innerText = filtrados.length;
       if (!filtrados.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-500">${
+        tbody.innerHTML = `<tr><td colspan="7" class="p-3 text-center text-slate-500">${
           ticketsCargados.length ? 'No hay tickets que coincidan con el filtro.' : 'No hay tickets registrados en GLPI.'
         }</td></tr>`;
         return;
@@ -1043,10 +1096,114 @@
             <td class="queue-date-column queue-date-cell px-3 py-2.5 text-slate-400 font-mono">${escaparHTML(ticket.date || '-')}</td>
             <td class="px-3 py-2.5"><span class="queue-status px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">${estadoNombre}</span></td>
             <td class="px-3 py-2.5"><span class="px-1 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${NIVELES_COLOR[urgencia] || 'bg-slate-800 text-slate-400'}">${urgencia}</span></td>
+            <td class="px-3 py-2.5">${celdaAgente(ticket.id)}</td>
             <td class="px-3 py-2.5">${botonFeedback}</td>
           </tr>
         `;
       }).join('');
+    }
+
+    function porcentaje(valor) {
+      return typeof valor === 'number' ? `${Math.round(valor * 100)}%` : 'N/D';
+    }
+
+    function celdaAgente(idTicket) {
+      const d = decisionesAgente[String(idTicket)];
+      if (!d) return '<span class="text-slate-500" title="Este ticket no pasó por el agente en este panel">Sin datos</span>';
+      const revision = d.requiere_revision_humana
+        ? '<span class="px-1 py-0.5 rounded text-[10px] font-semibold text-amber-400 border border-amber-800 whitespace-nowrap">Revisar</span>'
+        : '';
+      const id = Number.parseInt(idTicket, 10);
+      return `
+        <div class="flex items-center gap-1.5 flex-wrap">
+          ${revision}
+          <span class="text-slate-400 font-mono" title="Confianza del modelo de urgencia">${porcentaje(d.confianza_ml_urgencia)}</span>
+          <button onclick="verDetalle(${id})" class="text-xs text-slate-300 underline hover:text-white">Detalle</button>
+        </div>`;
+    }
+
+    function verDetalle(idTicket) {
+      const d = decisionesAgente[String(idTicket)];
+      if (!d) return;
+      const ticket = ticketsCargados.find(t => String(t.id) === String(idTicket)) || {};
+      document.getElementById('detalle-titulo').innerText = `Decisión del agente · Ticket #${idTicket}`;
+      document.getElementById('detalle-asunto').innerText = ticket.name || '';
+
+      const datos = [
+        ['Urgencia del agente', d.urgencia_final],
+        ['Urgencia en GLPI', urgenciaNombre(ticket.urgency) || 'Sin clasificar'],
+        ['Confianza del modelo', porcentaje(d.confianza_ml_urgencia)],
+        ['Requiere revisión', d.requiere_revision_humana ? 'Sí' : 'No'],
+        ['Formulario', d.formulario_final + (d.hubo_cambio_formulario ? ' (re-enrutado)' : '')],
+        ['Técnico', d.tecnico_asignado],
+        ['Aprendió de un técnico', d.aprendizaje_humano_aplicado ? 'Sí' : 'No'],
+        ['Duplicado / masivo', `${d.es_duplicado ? 'Duplicado' : 'No duplicado'} · ${d.es_incidente_masivo ? 'Masivo' : 'No masivo'}`],
+      ];
+      document.getElementById('detalle-datos').innerHTML = datos.map(([etiqueta, valor]) =>
+        `<div class="detalle-dato"><dt>${escaparHTML(etiqueta)}</dt><dd>${escaparHTML(valor ?? 'N/D')}</dd></div>`
+      ).join('');
+
+      const factores = d.factores || {};
+      document.getElementById('detalle-factores').innerHTML = Object.keys(NOMBRES_FACTORES).map(clave => {
+        const valor = typeof factores[clave] === 'boolean' ? (factores[clave] ? 'Sí' : 'No') : (factores[clave] ?? 'N/D');
+        return `<div class="detalle-dato"><dt>${NOMBRES_FACTORES[clave]}</dt><dd>${escaparHTML(valor)}</dd></div>`;
+      }).join('');
+
+      document.getElementById('detalle-justificacion').innerHTML =
+        (d.justificacion_fol || []).map(linea => `<li>${escaparHTML(linea)}</li>`).join('')
+        || '<li>Inferencia directa estándar</li>';
+      document.getElementById('detalle-dialog').showModal();
+    }
+
+    async function cargarCorrecciones() {
+      const tbody = document.getElementById('tabla-correcciones');
+      try {
+        const data = await obtenerJSON('/api/correcciones');
+        renderizarCorrecciones(data.correcciones || []);
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-rose-400">${escaparHTML(`No se pudieron cargar las correcciones: ${err.message}`)}</td></tr>`;
+      }
+    }
+
+    function renderizarCorrecciones(lista) {
+      const tbody = document.getElementById('tabla-correcciones');
+      if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">Aún no hay correcciones.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = lista.map(c => {
+        const estado = c.anulada ? 'Anulada' : (c.vigente ? 'Vigente' : 'Reemplazada');
+        const id = Number.parseInt(c.id_ticket, 10);
+        const accion = c.vigente && Number.isSafeInteger(id)
+          ? `<button onclick="deshacerCorreccion(${id})" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded border border-slate-700 transition">Deshacer</button>`
+          : '<span class="text-slate-500">-</span>';
+        const fecha = (c.timestamp || '').replace('T', ' ').slice(0, 16);
+        const cambio = `${c.urgencia_anterior || '?'} → ${c.urgencia_corregida || '?'}`;
+        return `
+          <tr class="hover:bg-slate-950">
+            <td class="px-3 py-2.5 font-mono text-slate-400">${escaparHTML(fecha)}</td>
+            <td class="px-3 py-2.5 font-mono text-slate-400">${escaparHTML(`#${c.id_ticket}`)}</td>
+            <td class="px-3 py-2.5 truncate" title="${escaparHTML(c.asunto || '')}">${escaparHTML(c.asunto || '(Sin asunto)')}</td>
+            <td class="px-3 py-2.5 whitespace-nowrap">${escaparHTML(cambio)}</td>
+            <td class="px-3 py-2.5">${estado}</td>
+            <td class="px-3 py-2.5">${accion}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    async function deshacerCorreccion(idTicket) {
+      if (!confirm(`¿Deshacer la corrección del ticket #${idTicket}? Se restaurará su urgencia anterior en GLPI.`)) return;
+      try {
+        const res = await obtenerJSON('/api/feedback/deshacer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id_ticket: idTicket })
+        });
+        if (!res.ok) throw new Error(res.mensaje || 'No se pudo deshacer la corrección');
+        await cargarMetricasYCola();
+      } catch (err) {
+        alert(err.message);
+      }
     }
 
     function urgenciaNombre(valor) {

@@ -147,6 +147,9 @@ def test_endpoint_feedback_guarda_urgencia_seleccionada():
             self.urgencias = []
             self.fallar_al_actualizar = False
 
+        def obtener_ticket(self, id_ticket):
+            return {"id": id_ticket, "urgency": 3}
+
         def actualizar_urgencia(self, id_ticket, urgencia):
             if self.fallar_al_actualizar:
                 raise GLPIError("Permiso de actualización denegado")

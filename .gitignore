@@ -4,3 +4,4 @@ __pycache__/
 .pytest_cache/
 # Memoria local de correcciones humanas (se genera al usar el dashboard)
 data/feedback_log.jsonl
+data/decisiones.jsonl

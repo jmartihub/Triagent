@@ -20,7 +20,7 @@ Implementa el ciclo completo del agente de Russell & Norvig:
    - Memoria episódica activa: las correcciones humanas alimentan la base de conocimiento en tiempo real.
 """
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 import json
 from pathlib import Path
@@ -68,6 +68,19 @@ ORDEN_ALCANCE = ("individual", "grupo", "institucional")
 ORDEN_PLAZO = ("ninguno", "cercano", "inmediato")
 
 
+NEGACIONES = ("no tengo ", "no tenemos ", "no hay ", "sin ", "tampoco ", "ni ")
+
+
+def aparece_sin_negar(texto_b: str, frase: str) -> bool:
+    """True si la frase aparece al menos una vez sin una negación justo antes."""
+    inicio = texto_b.find(frase)
+    while inicio != -1:
+        if not texto_b[max(0, inicio - 12):inicio].endswith(NEGACIONES):
+            return True
+        inicio = texto_b.find(frase, inicio + 1)
+    return False
+
+
 def factores_por_frases(texto_b: str, tiene_pregunta: bool = False) -> Dict[str, Any]:
     """Factores según las frases explícitas de config/senales.yaml.
 
@@ -75,6 +88,10 @@ def factores_por_frases(texto_b: str, tiene_pregunta: bool = False) -> Dict[str,
     distinguir "la frase dice que no" de "no hay ninguna frase".
     """
     evidencia = {clave: any(frase in texto_b for frase in frases) for clave, frases in SENALES.items()}
+    # "no tengo otro computador" contiene "otro computador": una alternativa negada no cuenta.
+    evidencia["con_alternativa"] = any(
+        aparece_sin_negar(texto_b, frase) for frase in SENALES["con_alternativa"]
+    )
     ya_resuelto = evidencia["incidente_resuelto"]
 
     if ya_resuelto or ((evidencia["consulta"] or tiene_pregunta) and not evidencia["falla"]):
@@ -171,15 +188,32 @@ class DecisionAgente:
     confianza_ml_urgencia: float
     confianza_ml_formulario: float
     aprendizaje_humano_aplicado: bool = False
+    factores: Dict[str, Any] = field(default_factory=dict)
+
+
+def _leer_jsonl(ruta: Path) -> List[Dict[str, Any]]:
+    return [json.loads(linea) for linea in ruta.read_text(encoding="utf-8").splitlines() if linea.strip()]
 
 
 class MemoriaAgente:
-    """Gestiona la memoria episódica y el aprendizaje activo basado en casos (CBR)."""
+    """Gestiona la memoria episódica y el aprendizaje activo basado en casos (CBR).
 
-    def __init__(self, ruta_log: Optional[Path] = None):
+    - ruta_log: correcciones humanas (append-only). Una línea con "anulada": true deja sin
+      efecto la corrección vigente de ese ticket.
+    - ruta_decisiones: si se indica, las decisiones del agente se guardan en disco para que el
+      dashboard las muestre después de reiniciar. Sin ella solo viven en memoria.
+    """
+
+    def __init__(self, ruta_log: Optional[Path] = None, ruta_decisiones: Optional[Path] = None):
         self.ruta_log = ruta_log or (RAIZ / "data" / "feedback_log.jsonl")
         self.ruta_log.parent.mkdir(parents=True, exist_ok=True)
+        self.ruta_decisiones = ruta_decisiones
         self.historial_decisiones: Dict[str, Dict[str, Any]] = {}
+        if ruta_decisiones and ruta_decisiones.exists():
+            for registro in _leer_jsonl(ruta_decisiones):
+                id_ticket = str(registro.get("decision", {}).get("id_ticket", ""))
+                if id_ticket:
+                    self.historial_decisiones[id_ticket] = registro
 
     def guardar_decision(self, decision: DecisionAgente, ticket_original: Dict[str, Any]):
         registro = {
@@ -188,6 +222,10 @@ class MemoriaAgente:
             "decision": asdict(decision),
         }
         self.historial_decisiones[str(decision.id_ticket)] = registro
+        if self.ruta_decisiones:
+            self.ruta_decisiones.parent.mkdir(parents=True, exist_ok=True)
+            with self.ruta_decisiones.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(registro, ensure_ascii=False, default=str) + "\n")
 
     def registrar_feedback_humano(
         self,
@@ -198,6 +236,7 @@ class MemoriaAgente:
         comentarios: str = "",
         asunto: str = "",
         descripcion: str = "",
+        urgencia_anterior: Optional[str] = None,
     ):
         """Registra la corrección efectuada por un técnico humano para aprendizaje en caliente."""
         if not asunto and str(id_ticket) in self.historial_decisiones:
@@ -211,35 +250,57 @@ class MemoriaAgente:
             "asunto": asunto,
             "descripcion": descripcion,
             "texto_completo": f"{asunto} {descripcion}".strip(),
+            "urgencia_anterior": urgencia_anterior,
             "urgencia_corregida": urgencia_humana,
             "formulario_corregido": formulario_humano,
             "tecnico_corregido": tecnico_humano,
             "comentarios": comentarios,
         }
+        self._agregar_al_log(registro)
+
+    def _agregar_al_log(self, registro: Dict[str, Any]):
         with self.ruta_log.open("a", encoding="utf-8") as f:
             f.write(json.dumps(registro, ensure_ascii=False) + "\n")
 
+    def leer_correcciones(self) -> List[Dict[str, Any]]:
+        """Todas las líneas del log, en orden cronológico."""
+        if not self.ruta_log.exists():
+            return []
+        return _leer_jsonl(self.ruta_log)
+
+    def correcciones_vigentes(self) -> Dict[str, Dict[str, Any]]:
+        """Última corrección de cada ticket, sin las anuladas."""
+        vigentes: Dict[str, Dict[str, Any]] = {}
+        for c in self.leer_correcciones():
+            id_ticket = str(c.get("id_ticket", ""))
+            if c.get("anulada"):
+                vigentes.pop(id_ticket, None)
+            elif c.get("texto_completo"):
+                # Se reinserta para que el orden refleje la corrección más reciente.
+                vigentes.pop(id_ticket, None)
+                vigentes[id_ticket] = c
+        return vigentes
+
+    def anular_correccion(self, id_ticket: str) -> Optional[Dict[str, Any]]:
+        """Deja sin efecto la corrección vigente de un ticket y la devuelve (None si no hay)."""
+        vigente = self.correcciones_vigentes().get(str(id_ticket))
+        if vigente is None:
+            return None
+        self._agregar_al_log({
+            "timestamp": datetime.now().isoformat(),
+            "id_ticket": str(id_ticket),
+            "anulada": True,
+            "corrección_anulada": vigente.get("timestamp"),
+        })
+        return vigente
+
     def buscar_caso_similar(self, texto_ticket: str, umbral: float = 0.55) -> Optional[Dict[str, Any]]:
         """Busca en la memoria si un técnico ya corrigió un caso semánticamente similar."""
-        if not self.ruta_log.exists():
-            return None
-
-        correcciones = []
         try:
-            for linea in self.ruta_log.read_text(encoding="utf-8").splitlines():
-                if linea.strip():
-                    correcciones.append(json.loads(linea))
-        except Exception:
+            # Un ticket puede corregirse varias veces: solo cuenta su corrección más reciente.
+            casos_con_texto = list(self.correcciones_vigentes().values())
+        except (OSError, ValueError):
             return None
-
-        # Un ticket puede corregirse varias veces: solo cuenta su corrección más reciente
-        # (el log es append-only, así que la última línea por ticket es la vigente).
-        vigentes: Dict[str, Dict[str, Any]] = {}
-        for c in correcciones:
-            if c.get("texto_completo"):
-                vigentes.pop(str(c.get("id_ticket", "")), None)
-                vigentes[str(c.get("id_ticket", ""))] = c
-        casos_con_texto = list(vigentes.values())
         if not casos_con_texto:
             return None
 
@@ -562,6 +623,7 @@ class AgenteTriaje:
             confianza_ml_urgencia=percepciones["conf_urg"],
             confianza_ml_formulario=percepciones["conf_form"],
             aprendizaje_humano_aplicado=razonamiento["aprendizaje_humano_aplicado"],
+            factores={f: percepciones[f] for f in FACTORES_RUBRICA},
         )
 
         # 4. MEMORIA

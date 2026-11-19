@@ -66,7 +66,8 @@ Todos los comandos se ejecutan desde la raíz del proyecto con `python main.py <
 | `train` | Entrena y evalúa el modelo clásico (TF-IDF + Regresión Logística). | No |
 | `deep` | Entrena y evalúa la red neuronal MLP. | No |
 | `sla` | Genera el histórico de SLA y compara modelos de regresión. | No |
-| `all` | Ejecuta `generate` → `train` → `deep` → `sla` en orden. | No |
+| `evaluar` | Compara modelos, reglas y agente completo en todos los conjuntos (`reports/evaluacion.json`). | No |
+| `all` | Ejecuta `generate` → `train` → `deep` → `sla` → `evaluar` en orden. | No |
 
 Las métricas de entrenamiento se escriben en `reports/metrics.json` y `reports/metrics_deep.json`; los modelos, en `models/*.joblib`.
 
@@ -197,7 +198,8 @@ Triagent/
 ## Datos
 
 - **Tickets sintéticos** (`generate.py` + `banks.py`): 6.000 tickets con la forma de los formularios de Tooli (Fallas Técnicas TIC, Salas de Cómputo, Procesos de Pago, Soporte Durante Matrícula). Se añade ruido realista: pistas omitidas, errores de tipeo, registro informal, un 12 % de formularios equivocados y un 5 % de ruido en la etiqueta.
-- **Conjunto gold** (`gold_manual.csv`): 24 tickets redactados a mano, seis por nivel de urgencia. Es la mejor aproximación disponible a tickets reales, pero es muy pequeño.
+- **Gold de desarrollo** (`gold_manual.csv`): 24 tickets redactados a mano, seis por nivel de urgencia. Las reglas se ajustaron mirando estos tickets, así que ya no sirven como medida independiente.
+- **Gold de validación** (`gold_holdout.csv`): 80 tickets redactados a mano (20 por urgencia, 5 con formulario equivocado) con los cinco factores etiquetados; la urgencia se obtiene aplicando la rúbrica a esos factores. **No se debe usar para ajustar reglas ni modelos**: si se ajusta mirando sus errores, deja de medir. Se escribieron conociendo el sistema, así que sigue siendo menos exigente que tickets reales.
 - **Histórico de SLA** (`historico_sla.csv`): generado con una función conocida de urgencia, complejidad y carga de la cola.
 
 Más ejemplos sintéticos no garantizan más precisión: el texto proviene de plantillas, así que las métricas sobre el conjunto sintético son optimistas.
@@ -206,7 +208,24 @@ Más ejemplos sintéticos no garantizan más precisión: el texto proviene de pl
 
 ## Evaluación experimental
 
-### Clasificación de urgencia
+### Agente completo vs. componentes
+
+`python main.py evaluar` compara cuatro estrategias sobre los mismos tickets: el modelo clásico, el MLP, las **reglas solas** (rúbrica sobre los factores que detecta la percepción) y el **agente** completo (lo que usa el dashboard).
+
+| Estrategia | Sintético (n=1.200) | Gold desarrollo (n=24) | Gold validación (n=80) | Críticos subestimados (validación) ↓ |
+| :--- | :---: | :---: | :---: | :---: |
+| Regresión Logística | 0.764 | 0.625 | 0.375 | 20 % |
+| Red MLP | **0.800** | 0.667 | **0.438** | 35 % |
+| Reglas solas | 0.623 | 1.000 | **0.438** | 60 % |
+| Agente completo | 0.623 | 1.000 | **0.438** | 60 % |
+
+*Exactitud de urgencia.* Lecturas:
+
+- **El agente decide igual que las reglas.** La urgencia final sale del motor FOL, que reproduce la rúbrica sobre los factores percibidos; el modelo solo influye cuando su confianza es baja.
+- **El 100 % en el gold de desarrollo es sobreajuste**: en tickets nuevos el agente baja a 44 % y deja pasar como Baja o Media el 60 % de los Críticos.
+- **El cuello de botella es la percepción.** Exactitud de los factores detectados en el gold de validación: tipo 0.94, alcance 0.80, alternativa 0.82, plazo 0.70, bloquea 0.64. Frases como "hoy cierran", "ahorita", "quedan 40 min" o "a nadie le abre" no están en `config/senales.yaml`.
+
+### Clasificación de urgencia (solo modelos)
 
 | Modelo | Conjunto | Exactitud | Macro-F1 | Críticos subestimados ↓ |
 | :--- | :--- | :---: | :---: | :---: |
@@ -216,7 +235,7 @@ Más ejemplos sintéticos no garantizan más precisión: el texto proviene de pl
 | Regresión Logística (TF-IDF) | Gold manual (n=24) | 0.6250 | 0.5333 | 33.33 % |
 | Red MLP | Gold manual (n=24) | **0.6667** | **0.6199** | **16.67 %** |
 
-"Críticos subestimados" es la fracción de tickets Críticos que el modelo predijo como Baja o Media (menor es mejor; no cuenta las predicciones Alta). En el conjunto gold cada clase tiene solo seis tickets, así que un ticket equivale a ~17 puntos porcentuales: los resultados son preliminares. Estas cifras corresponden al **modelo solo**; en el agente, las reglas FOL y las anulaciones de seguridad corrigen parte de estos errores (ver `tests/test_priority_cases.py`).
+"Críticos subestimados" es la fracción de tickets Críticos que el modelo predijo como Baja o Media (menor es mejor; no cuenta las predicciones Alta). En el conjunto gold cada clase tiene solo seis tickets, así que un ticket equivale a ~17 puntos porcentuales: los resultados son preliminares. Estas cifras corresponden al **modelo solo**; la tabla anterior compara con el agente completo.
 
 ### Formulario correcto
 
@@ -315,10 +334,11 @@ Cada archivo también puede ejecutarse por separado como script:
 ```bash
 python tests/test_rubric.py           # Rúbrica de urgencia
 python tests/test_reasoning.py        # Ontología y motor FOL
-python tests/test_priority_cases.py   # Agente vs. los 24 tickets gold
+python tests/test_priority_cases.py   # Agente vs. los 24 tickets del gold de desarrollo
 python tests/test_clustering_cases.py # Duplicados e incidentes masivos
 python tests/test_agent_full.py       # Ciclo completo del agente + GLPI mock
 python tests/test_memoria.py          # Memoria de correcciones humanas (CBR)
+python tests/test_evaluate.py         # Evaluación y consistencia del gold de validación
 python tests/test_glpi_client.py      # Cliente de GLPI
 python tests/test_dashboard.py        # Endpoints del dashboard
 python tests/test_main.py             # Arranque y carga de .env
@@ -329,7 +349,8 @@ python tests/test_main.py             # Arranque y carga de .env
 
 ## Limitaciones conocidas
 
-- **Datos:** el entrenamiento es sintético y la evaluación con texto humano se limita a 24 tickets. Antes de un uso real se necesita un conjunto etiquetado de tickets reales.
+- **Datos:** el entrenamiento es sintético y la evaluación con texto humano se limita a 104 tickets escritos por el equipo. Antes de un uso real se necesita un conjunto etiquetado de tickets reales.
+- **Rendimiento en tickets nuevos:** en el gold de validación el agente acierta el 44 % de las urgencias (ver [Evaluación experimental](#evaluación-experimental)).
 - **Extracción de factores por palabras clave:** tipo, alcance, bloqueo, plazo y alternativa se detectan con las listas de frases de [`config/senales.yaml`](config/senales.yaml). Expresiones no contempladas pueden pasar desapercibidas; se pueden agregar frases en ese archivo sin tocar el código.
 - **Memoria de casos:** una corrección humana sobre un ticket similar (umbral 0.55) reemplaza la urgencia deducida por las reglas. Solo cuenta la corrección más reciente de cada ticket, y una urgencia Crítica nunca se rebaja automáticamente: se mantiene y se pide revisión humana.
 - **SLA:** el histórico es sintético y la carga de la cola de entrenamiento va de 1 a 44 tickets; con colas mucho mayores el modelo extrapola.

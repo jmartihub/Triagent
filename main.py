@@ -6,6 +6,7 @@ Comandos disponibles:
     python main.py interactivo  # Modo interactivo en consola: ingresa tickets por teclado
     python main.py deep         # Entrena y evalúa la variante de Deep Learning (MLP)
     python main.py sla          # Entrena y evalúa los modelos de regresión para SLA
+    python main.py evaluar      # Compara modelos, reglas y agente completo en todos los conjuntos
     python main.py generate     # Genera el dataset sintético con ruido
     python main.py train        # Entrena y evalúa el modelo base clásico (TF-IDF + Logística)
     python main.py all          # Ejecuta todo el ciclo en orden
@@ -72,7 +73,7 @@ COMANDOS = {
     nombre: nombre
     for nombre in (
         "demo", "interactivo", "interactive", "web", "dashboard", "front",
-        "generate", "train", "deep", "sla", "all",
+        "generate", "train", "deep", "sla", "all", "evaluar",
     )
 }
 
@@ -169,7 +170,11 @@ def main():
         from triage import sla_regression
         sla_regression.main()
 
-    if comando not in ("demo", "interactivo", "interactive", "generate", "train", "deep", "sla", "all"):
+    if comando in ("evaluar", "all"):
+        from triage import evaluate
+        evaluate.main()
+
+    if comando not in ("demo", "interactivo", "interactive", "generate", "train", "deep", "sla", "all", "evaluar"):
         print(__doc__)
         sys.exit(1)
 

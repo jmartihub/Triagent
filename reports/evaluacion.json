@@ -1,0 +1,103 @@
+{
+  "sintetico_prueba": {
+    "urgencia": {
+      "modelo_clasico": {
+        "n": 1200,
+        "accuracy": 0.7642,
+        "macro_f1": 0.7219,
+        "criticos_subestimados": 0.0625
+      },
+      "modelo_mlp": {
+        "n": 1200,
+        "accuracy": 0.8,
+        "macro_f1": 0.7492,
+        "criticos_subestimados": 0.0729
+      },
+      "reglas_solas": {
+        "n": 1200,
+        "accuracy": 0.6225,
+        "macro_f1": 0.5893,
+        "criticos_subestimados": 0.2396
+      },
+      "agente": {
+        "n": 1200,
+        "accuracy": 0.6225,
+        "macro_f1": 0.5893,
+        "criticos_subestimados": 0.2396
+      }
+    },
+    "formulario_agente": 1.0,
+    "factores_percepcion": {
+      "tipo": 0.9275,
+      "alcance": 0.935,
+      "bloquea": 0.8075,
+      "plazo": 0.785,
+      "alternativa": 0.8325
+    }
+  },
+  "gold_manual": {
+    "urgencia": {
+      "modelo_clasico": {
+        "n": 24,
+        "accuracy": 0.625,
+        "macro_f1": 0.5333,
+        "criticos_subestimados": 0.3333
+      },
+      "modelo_mlp": {
+        "n": 24,
+        "accuracy": 0.6667,
+        "macro_f1": 0.6199,
+        "criticos_subestimados": 0.1667
+      },
+      "reglas_solas": {
+        "n": 24,
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "criticos_subestimados": 0.0
+      },
+      "agente": {
+        "n": 24,
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "criticos_subestimados": 0.0
+      }
+    },
+    "formulario_agente": 0.9583
+  },
+  "gold_holdout": {
+    "urgencia": {
+      "modelo_clasico": {
+        "n": 80,
+        "accuracy": 0.375,
+        "macro_f1": 0.324,
+        "criticos_subestimados": 0.2
+      },
+      "modelo_mlp": {
+        "n": 80,
+        "accuracy": 0.4375,
+        "macro_f1": 0.3866,
+        "criticos_subestimados": 0.35
+      },
+      "reglas_solas": {
+        "n": 80,
+        "accuracy": 0.4375,
+        "macro_f1": 0.4028,
+        "criticos_subestimados": 0.6
+      },
+      "agente": {
+        "n": 80,
+        "accuracy": 0.4375,
+        "macro_f1": 0.4028,
+        "criticos_subestimados": 0.6
+      }
+    },
+    "formulario_agente": 0.9125,
+    "factores_percepcion": {
+      "tipo": 0.9375,
+      "alcance": 0.8,
+      "bloquea": 0.6375,
+      "plazo": 0.7,
+      "alternativa": 0.825
+    }
+  }
+}

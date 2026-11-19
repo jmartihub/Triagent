@@ -1,0 +1,9 @@
+[project]
+name = "triagent"
+version = "0.1.0"
+description = "Agente neuro-simbólico de triaje y priorización de tickets (Tooli / GLPI)"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]

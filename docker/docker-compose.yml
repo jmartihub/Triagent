@@ -1,8 +1,6 @@
-version: "3.8"
-
 services:
   mariadb:
-    image: mariadb:10.11
+    image: mariadb:10.11@sha256:7d829180b5b2a9ba74f6242876ab401a0d7dd338a807e522ef92bc9698760f20
     container_name: glpi_database
     restart: always
     environment:
@@ -16,7 +14,8 @@ services:
       - glpi_network
 
   glpi:
-    image: diouxx/glpi:latest
+    # Imagen fijada por digest; la versión de GLPI que descarga se fija con VERSION_GLPI.
+    image: diouxx/glpi@sha256:9ca43af63ddcb7e1c9b7b452a50b8204980ac549526dee1c00296793bfe7789f
     container_name: glpi_app
     restart: always
     depends_on:
@@ -25,6 +24,7 @@ services:
       - "8080:80"
     environment:
       TIMEZONE: "America/Bogota"
+      VERSION_GLPI: "12.0.2"
       MARIADB_HOST: mariadb
       MARIADB_PORT: 3306
       MARIADB_DATABASE: glpi_db

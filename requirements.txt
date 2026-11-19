@@ -1,4 +1,7 @@
-scikit-learn>=1.3
+# scikit-learn fijado: los modelos en models/*.joblib se serializaron con esta versión.
+# Si se cambia, reentrenar con `python main.py all`.
+scikit-learn==1.9.1
+numpy>=2.0
 pandas>=2.0
 PyYAML>=6.0
 joblib>=1.3

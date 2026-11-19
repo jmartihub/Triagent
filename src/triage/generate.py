@@ -17,8 +17,9 @@ from pathlib import Path
 
 import yaml
 
-from .banks import (ALCANCE, ALTERNATIVA, BLOQUEO, CIERRES, FT, INTROS_DUDA,
-                    INTROS_FALLA, P_URGENTE, PLAZO, PP, SC, SINTOMAS, SM)
+from .banks import (ALCANCE, ALTERNATIVA, BLOQUEO, CIERRES, DIAS, EVENTOS, FT, HORAS,
+                    INTROS_DUDA, INTROS_FALLA, P_URGENTE, PLAZO, PP, SC, SINTOMAS, SM,
+                    TRAMITES)
 from .rubric import Factores, desplazar, urgencia
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -58,6 +59,20 @@ def sortear_factores(rng):
     return Factores(tipo, alcance, bloquea, plazo, alternativa)
 
 
+def rellenar(frase, rng):
+    """Sustituye los marcadores de las pistas ({n}, {h}, {evento}...) por valores al azar."""
+    evento, tramite = rng.choice(EVENTOS), rng.choice(TRAMITES)
+    valores = {
+        "n": str(rng.choice([5, 10, 15, 20, 25, 30, 40, 45])),
+        "h": rng.choice(HORAS),
+        "d": str(rng.randint(2, 5)),
+        "dia": rng.choice(DIAS),
+        "evento": evento, "Evento": mayuscula(evento),
+        "tramite": tramite, "Tramite": mayuscula(tramite),
+    }
+    return frase.format(**valores) if "{" in frase else frase
+
+
 def frases_de_factores(f, rng):
     """Frases que revelan los factores; cada pista se omite a veces (ambigüedad real)."""
     frases = []
@@ -77,7 +92,7 @@ def frases_de_factores(f, rng):
     elif f.plazo == "ninguno" and rng.random() < 0.15:
         frases.append(rng.choice(PLAZO["ninguno"]))
     rng.shuffle(frases)
-    return frases
+    return [rellenar(frase, rng) for frase in frases]
 
 
 def mayuscula(texto):

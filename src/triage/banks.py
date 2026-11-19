@@ -208,17 +208,57 @@ SINTOMAS = {
 }
 
 # --- Frases por factor de la rúbrica -------------------------------------------------
+# Pueden llevar marcadores que generate.py rellena al azar:
+#   {n} minutos (5-50), {h} hora del día, {d} número de días (2-5), {dia} día de la semana,
+#   {evento}/{Evento} actividad con hora fija, {tramite}/{Tramite} trámite con fecha límite.
+# Hay frases literales ("no puedo continuar") e implícitas ("no hay más equipos libres"):
+# el modelo debe aprender el factor, no memorizar unas pocas frases.
+
+EVENTOS = [
+    "el parcial", "el quiz", "la sustentación", "el examen final", "la evaluación",
+    "la exposición", "el laboratorio", "la clase", "la prueba", "el examen de inglés",
+    "la entrega del proyecto", "el previo",
+]
+TRAMITES = [
+    "el pago de la matrícula", "la inscripción de materias", "la legalización de la matrícula",
+    "el pago de grado", "la entrega de documentos",
+    "el retiro de materias", "la convocatoria de la beca", "el pago del curso",
+]
+HORAS = ["las 2", "las 3 pm", "las 5", "las 6 de la tarde", "mediodía", "las 11:59", "medianoche", "las 10"]
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado"]
 
 ALCANCE = {
     "grupo": [
         "A todo mi grupo le pasa lo mismo.",
         "A varios compañeros de la clase les pasa igual.",
         "Somos como veinte en el salón y a todos nos sale el mismo error.",
+        "No soy solo yo, mis compañeros están igual.",
+        "Ninguno de los que estamos en el laboratorio puede entrar.",
+        "Les pasa a todos los del curso.",
+        "Mis compañeros de semestre tienen el mismo problema.",
+        "En la sala ningún equipo funciona.",
+        "Estamos todos los del grupo igual, nadie ha podido.",
+        "Ya pregunté y a los demás también les sale.",
+        "A la mitad del salón le pasa.",
+        "Según el profesor, a toda la clase le sale lo mismo.",
+        "Somos varios con el mismo error.",
+        "a toda mi carrera le pasa",
+        "Ningún compañero ha podido hacerlo.",
+        "Todo el piso está igual.",
     ],
     "institucional": [
         "Parece que se cayó para toda la universidad.",
         "Nadie en el campus puede usarlo.",
         "A todos los estudiantes les aparece el mismo error.",
+        "Está caído en todas las sedes.",
+        "Al parecer es general, no le funciona a nadie.",
+        "Es en toda la U, no solo a mí.",
+        "En los grupos de WhatsApp todo el mundo dice lo mismo.",
+        "Ninguna facultad tiene servicio.",
+        "Se cayó el servicio completo.",
+        "nadie de la universidad puede entrar",
+        "Es una caída general del sistema.",
+        "Tanto estudiantes como profesores estamos sin servicio.",
     ],
 }
 
@@ -231,11 +271,37 @@ BLOQUEO = {
         "No puedo cerrar la página ni volver a la actividad.",
         "El navegador no responde y no puedo continuar.",
         "La página se abre de nuevo cada vez que intento cerrarla.",
+        "No he podido entrar de ninguna forma.",
+        "Me saca cada vez que intento entrar.",
+        "Se queda cargando y nunca abre.",
+        "Me rechaza todo el tiempo.",
+        "Llevo una hora intentando y nada.",
+        "No hay forma de que funcione.",
+        "Me sale error y no pasa de ahí.",
+        "No puedo hacer el trámite.",
+        "No me deja ni iniciar sesión.",
+        "Intento y vuelve a fallar.",
+        "Así no puedo trabajar.",
+        "Se apaga apenas lo prendo.",
+        "No carga nada.",
+        "me tiene parado",
+        "No puedo enviar nada.",
+        "Me quedé por fuera.",
+        "No hay manera de entrar.",
     ],
     False: [
         "No es grave, igual puedo seguir trabajando.",
         "Es más una molestia que otra cosa.",
         "No me impide trabajar pero quería reportarlo.",
+        "Igual funciona, solo que lento.",
+        "Funciona a ratos, se puede usar.",
+        "Molesta, pero se puede usar.",
+        "Al final sí me dejó, solo que se demora.",
+        "No me afecta mucho.",
+        "Solo lo comento para que lo revisen.",
+        "Puedo seguir usándolo normal.",
+        "Es un detalle, no algo urgente.",
+        "Sigue funcionando, pero raro.",
     ],
 }
 
@@ -249,14 +315,44 @@ PLAZO = {
         "El parcial está en curso y debo enviarlo antes de que cierre.",
         "Me quedan pocos minutos para terminar la evaluación.",
         "La sustentación ya empezó.",
+        "Tengo {evento} en {n} minutos.",
+        "{Evento} empieza en {n} minutos.",
+        "{Evento} es ahorita.",
+        "Estoy en {evento} en este momento.",
+        "Me quedan {n} minutos de {evento}.",
+        "Hoy a {h} cierra {tramite}.",
+        "{Tramite} vence hoy a {h}.",
+        "{Tramite} se acaba hoy.",
+        "Es para ya, {evento} ya empezó.",
+        "En {n} min tengo {evento}.",
+        "Lo necesito ya mismo.",
+        "El profe está esperando.",
+        "El tiempo de {evento} está corriendo.",
     ],
     "cercano": [
         "Mañana cierra el plazo.",
         "Tengo una entrega el viernes.",
         "La próxima semana tengo una sustentación.",
         "Tengo que resolverlo en los próximos días.",
+        "{Tramite} cierra el {dia}.",
+        "Tengo {evento} el {dia}.",
+        "{Evento} es mañana.",
+        "{Evento} es pasado mañana.",
+        "En {d} días vence {tramite}.",
+        "El plazo se vence esta semana.",
+        "Tengo hasta el {dia}.",
+        "Lo necesito antes del {dia}.",
+        "{Tramite} es la otra semana.",
+        "Me queda poco tiempo, {tramite} cierra en {d} días.",
     ],
-    "ninguno": ["No tengo afán.", "No es para ya."],
+    "ninguno": [
+        "No tengo afán.",
+        "No es para ya.",
+        "Cuando puedan lo revisan.",
+        "No hay prisa.",
+        "No es urgente.",
+        "Lo pueden mirar con calma.",
+    ],
 }
 
 ALTERNATIVA = {
@@ -264,11 +360,31 @@ ALTERNATIVA = {
         "Mientras tanto lo estoy haciendo desde el celular.",
         "Por ahora puedo usar el computador de un amigo.",
         "Por ahora me funciona desde otro dispositivo.",
+        "Desde otro navegador sí funciona.",
+        "Un compañero me presta su computador mientras tanto.",
+        "Puedo ir a otra sala por ahora.",
+        "Me conecté con los datos del celular.",
+        "En la app sí funciona.",
+        "Puedo hacerlo presencial si toca.",
+        "Lo voy a mandar por correo mientras tanto.",
+        "Desde la casa sí me deja.",
+        "Hay otros equipos libres.",
+        "puedo pagar en el banco mientras tanto",
+        "El profe me deja enviarlo por otro medio.",
     ],
     False: [
         "No tengo otra forma de hacerlo.",
         "Es la única forma que tengo.",
         "No encuentro otra manera.",
+        "No tengo otro computador.",
+        "Los otros equipos están ocupados.",
+        "Solo se puede hacer por ahí.",
+        "Me queda imposible ir hasta la universidad.",
+        "No tengo datos en el celular.",
+        "Solo lo reciben por ese canal.",
+        "No hay otra opción.",
+        "Tampoco me deja desde el celular.",
+        "Ya probé en otro computador y tampoco.",
     ],
 }
 

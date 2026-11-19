@@ -1,9 +1,9 @@
 {
   "sintetico_prueba": {
     "tipo": 1.0,
-    "alcance": 0.955,
-    "bloquea": 0.9492,
-    "plazo": 0.9333,
-    "alternativa": 0.7833
+    "alcance": 0.9608,
+    "bloquea": 0.9458,
+    "plazo": 0.9058,
+    "alternativa": 0.7798
   }
 }

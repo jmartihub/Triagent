@@ -5,3 +5,6 @@ __pycache__/
 # Memoria local de correcciones humanas (se genera al usar el dashboard)
 data/feedback_log.jsonl
 data/decisiones.jsonl
+
+# Material de la sustentación (documento, diapositivas, guion): no se versiona
+entregables/

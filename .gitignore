@@ -1,2 +1,6 @@
 .env
-__pycache__
+__pycache__/
+.venv/
+.pytest_cache/
+# Memoria local de correcciones humanas (se genera al usar el dashboard)
+data/feedback_log.jsonl

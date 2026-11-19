@@ -41,8 +41,26 @@ def cargar_entorno_local(archivo=None):
 cargar_entorno_local()
 
 # Si se ejecuta con el python global del sistema, re-ejecutar automáticamente con .venv
-venv_python = Path(__file__).resolve().parent / ".venv" / "bin" / "python"
-if venv_python.exists() and sys.executable != str(venv_python) and "VIRTUAL_ENV" not in os.environ:
+def _python_del_venv():
+    venv = Path(__file__).resolve().parent / ".venv"
+    for candidato in (venv / "Scripts" / "python.exe", venv / "bin" / "python"):
+        if candidato.exists():
+            return candidato
+    return None
+
+
+def reejecutar_con_venv():
+    """Si se ejecuta con el python global y existe .venv, relanza el comando con el del venv."""
+    venv_python = _python_del_venv()
+    if (
+        not venv_python
+        or "VIRTUAL_ENV" in os.environ
+        or Path(sys.executable).resolve() == venv_python.resolve()
+    ):
+        return
+    if os.name == "nt":
+        # En Windows os.execv no reemplaza el proceso y rompe la consola; se usa un subproceso.
+        sys.exit(subprocess.call([str(venv_python)] + sys.argv))
     os.execv(str(venv_python), [str(venv_python)] + sys.argv)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
@@ -130,4 +148,5 @@ def main():
 
 
 if __name__ == "__main__":
+    reejecutar_con_venv()
     main()

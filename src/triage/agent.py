@@ -28,6 +28,7 @@ import sys
 from typing import Any, Dict, List, Optional
 import unicodedata
 import joblib
+import yaml
 
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ / "src"))
@@ -38,6 +39,9 @@ from triage.ontology import AsignacionTecnica, OntologiaTI
 from triage.response_generator import GeneradorRespuestaPreliminar
 from triage.sla_regression import EstimadorSLA
 
+NIVELES_URGENCIA = ("Baja", "Media", "Alta", "Crítica")
+CARGA_COLA_POR_DEFECTO = 12
+
 
 def limpiar_texto(texto: str) -> str:
     """Normaliza tildes y minúsculas para matching semántico robusto."""
@@ -45,17 +49,22 @@ def limpiar_texto(texto: str) -> str:
     return "".join(c for c in norm if unicodedata.category(c) != "Mn").lower()
 
 
+def cargar_senales(ruta: Optional[Path] = None) -> Dict[str, tuple]:
+    """Carga las frases de config/senales.yaml normalizadas igual que el texto del ticket."""
+    ruta = ruta or (RAIZ / "config" / "senales.yaml")
+    datos = yaml.safe_load(ruta.read_text(encoding="utf-8")) or {}
+    return {
+        clave: tuple(limpiar_texto(str(frase)) for frase in (frases or []))
+        for clave, frases in datos.items()
+    }
+
+
+SENALES = cargar_senales()
+
+
 def detectar_riesgo_seguridad_personal(texto: str) -> bool:
     """Detecta expresiones explícitas de peligro físico que requieren atención inmediata."""
-    senales_urgentes = (
-        "mano atrapada", "mano atorada", "dedo atrapado", "dedos atrapados",
-        "brazo atrapado", "brazo atorado", "pierna atrapada", "pierna atorada",
-        "no puedo sacar la mano", "no puedo sacar el brazo",
-        "me voy a desmayar", "me estoy desmayando", "creo que me desmayo",
-        "no puedo respirar", "dificultad para respirar", "dolor en el pecho",
-        "sangrado abundante", "convulsionando", "perdi el conocimiento",
-    )
-    return any(senal in texto for senal in senales_urgentes)
+    return any(senal in texto for senal in SENALES["riesgo_seguridad_personal"])
 
 
 @dataclass
@@ -104,7 +113,7 @@ class MemoriaAgente:
         self,
         id_ticket: str,
         urgencia_humana: str,
-        formulario_humano: str,
+        formulario_humano: Optional[str],
         tecnico_humano: Optional[str] = None,
         comentarios: str = "",
         asunto: str = "",
@@ -143,7 +152,14 @@ class MemoriaAgente:
         except Exception:
             return None
 
-        casos_con_texto = [c for c in correcciones if c.get("texto_completo")]
+        # Un ticket puede corregirse varias veces: solo cuenta su corrección más reciente
+        # (el log es append-only, así que la última línea por ticket es la vigente).
+        vigentes: Dict[str, Dict[str, Any]] = {}
+        for c in correcciones:
+            if c.get("texto_completo"):
+                vigentes.pop(str(c.get("id_ticket", "")), None)
+                vigentes[str(c.get("id_ticket", ""))] = c
+        casos_con_texto = list(vigentes.values())
         if not casos_con_texto:
             return None
 
@@ -156,7 +172,8 @@ class MemoriaAgente:
         try:
             mat = vec.fit_transform(textos_historicos + [texto_ticket])
             sims = cosine_similarity(mat[-1], mat[:-1])[0]
-            max_idx = int(np.argmax(sims))
+            # Ante empate de similitud, preferir la corrección más reciente.
+            max_idx = len(sims) - 1 - int(np.argmax(sims[::-1]))
             if sims[max_idx] >= umbral:
                 caso = dict(casos_con_texto[max_idx])
                 caso["similitud"] = float(sims[max_idx])
@@ -174,6 +191,9 @@ class AgenteTriaje:
         self.clustering = DetectorIncidentesNoSupervisado()
         self.generador_respuesta = GeneradorRespuestaPreliminar()
         self.memoria = MemoriaAgente()
+        # Tickets abiertos en la cola; alimenta la estimación de SLA. El dashboard la
+        # actualiza con los datos de GLPI; sin esa información se usa un valor típico.
+        self.carga_cola = CARGA_COLA_POR_DEFECTO
 
         # Cargar regresor de SLA si existe
         ruta_sla = RAIZ / "models" / "sla_regression.joblib"
@@ -229,160 +249,49 @@ class AgenteTriaje:
         texto_b = limpiar_texto(f"{asunto} {descripcion}")
         riesgo_seguridad_personal = detectar_riesgo_seguridad_personal(texto_b)
 
+        def contiene(clave: str) -> bool:
+            return any(frase in texto_b for frase in SENALES[clave])
+
         # Detección de incidente resuelto o aviso sin impacto activo
-        frases_resueltas = [
-            "ya todo esta bien", "ya esta bien", "ya funciona", "ya se arreglo",
-            "ya se soluciono", "solo duro", "duro 5 minutos", "era solo una actualizacion",
-            "ya pude entrar", "ya tengo acceso", "falsa alarma", "no era nada",
-            "se arreglo solo", "se soluciono solo"
-        ]
-        ya_resuelto = any(f in texto_b for f in frases_resueltas)
+        ya_resuelto = contiene("incidente_resuelto")
 
         # Tipo
-        terminos_duda = [
-            "como", "quisiera saber", "consulta", "pregunta", "donde", "orientacion",
-            "procedimiento", "proceso", "requisitos", "informacion sobre", "solicito saber",
-            "como puedo", "donde puedo", "que debo hacer", "solicitud de", "inquietud",
-            "como descargar", "como instalar", "como pagar", "como ingresar por primera vez",
-            "instrucciones", "tutorial", "guia", "se puede", "no se si",
-            "solo quiero confirmar", "quiero confirmar", "me gustaria saber",
-            "es posible", "cuantos", "cuantas", "hasta que hora"
-        ]
-        terminos_falla = [
-            "error", "fallo", "falla", "no funciona", "caido", "bloqueado", "denegado",
-            "no tengo acceso", "no abre", "se congela", "pantalla negra", "pantallazo",
-            "se cierra", "no me deja", "no puedo ingresar", "no conecta", "sin internet",
-            "sin conexion", "dañado", "interrupcion", "lentitud extrema", "no se puede",
-            "no puedo salir", "no puedo cerrar", "no puedo volver al examen",
-            "sitio sospechoso", "sitio extraño", "pagina extraña", "pagina sospechosa",
-            "me redirige", "ventanas emergentes", "pop ups", "navegador bloqueado",
-            "atrapado en paginas", "atrapado en una pagina",
-            "no puedo pagar", "no puedo enviar", "no puedo usar",
-            "no puedo hacer", "no enciende", "no encienden", "no hay wifi",
-            "sin wifi", "no hay internet", "restablecimiento no me llega",
-            "nadie de mi programa puede entrar", "nadie puede entrar",
-            "nadie puede conectarse"
-        ]
-        hay_senal_de_consulta = any(w in texto_b for w in terminos_duda) or "?" in f"{asunto} {descripcion}"
-        hay_senal_de_falla = any(w in texto_b for w in terminos_falla)
-        if ya_resuelto:
-            tipo = "duda"
-        elif hay_senal_de_consulta and not hay_senal_de_falla:
+        hay_senal_de_consulta = contiene("consulta") or "?" in f"{asunto} {descripcion}"
+        if ya_resuelto or (hay_senal_de_consulta and not contiene("falla")):
             tipo = "duda"
         else:
             tipo = "falla"
 
         # Alcance
-        if any(w in texto_b for w in [
-            "toda la universidad", "todo el campus", "a todos los estudiantes",
-            "nadie en la universidad", "todo el edificio", "en toda la sede",
-            "caida masiva", "caida general", "a nivel general", "servidor caido",
-            "a nadie le funciona", "nadie de mi programa", "nadie del programa",
-            "a todo mi programa", "todos los estudiantes de mi programa",
-            "nadie puede entrar", "nadie puede conectarse"
-        ]):
+        if contiene("alcance_institucional"):
             alcance = "institucional"
-        elif any(w in texto_b for w in [
-            "todo el salon", "mi grupo", "varios companeros", "a todos nos sale",
-            "en mi clase", "en la sala", "en el laboratorio", "a varios",
-            "a todo el curso", "en el bloque", "todo el piso", "varios estamos afectados"
-        ]):
+        elif contiene("alcance_grupo"):
             alcance = "grupo"
         else:
             alcance = "individual"
 
-        # Bloqueo
-        no_bloquea_frases = [
-            "puedo seguir trabajando", "no es grave", "solo queria reportarlo",
-            "no me impide", "ya todo esta bien", "ya esta bien", "ya funciona",
-            "ya pude", "duro 5 minutos", "era solo una actualizacion", "solo es una duda",
-            "solo quiero saber", "es informativo", "funciona pero", "solo queria preguntar",
-            "puedo seguir conectado", "puedo trabajar", "igual puedo trabajar",
-            "igual puedo", "a veces", "por momentos", "solo lo reporto",
-            "no tengo afan", "cruce de horarios"
-        ]
-        terminos_bloqueo = [
-            "no tengo acceso", "bloqueado", "acceso denegado", "no me deja entrar",
-            "no puedo ingresar", "completamente bloqueado", "no puedo continuar",
-            "no deja hacer nada", "imposible acceder", "no puedo presentar",
-            "no me deja pagar", "no puedo enviar", "no puedo matricular", "cuenta suspendida",
-            "no carga el examen", "no abre el examen", "se queda en blanco", "clave incorrecta",
-            "no me deja", "no abre", "no carga", "no inicia", "no funciona", "no responde",
-            "no puedo salir", "no puedo cerrar la pagina", "no puedo cerrar el navegador",
-            "no puedo volver al examen", "atrapado en paginas", "atrapado en una pagina",
-            "navegador bloqueado", "no responde el navegador", "me redirige una y otra vez",
-            "no conecta", "no me deja usar", "no puedo usar", "no puedo conectarme",
-            "no me deja conectarme", "no hay wifi", "sin wifi",
-            "no hay internet", "nadie puede conectarse", "se cerro el programa",
-            "nadie de mi programa puede entrar",
-            "no me aparece abierta la inscripcion", "error al pagar", "no puedo pagar",
-            "no se puede ingresar", "no se puede conectar", "error al unir",
-            "restablecimiento no me llega", "no puedo hacer mis actividades",
-            "no encienden", "no enciende"
-        ]
-        if ya_resuelto or any(w in texto_b for w in no_bloquea_frases):
-            bloquea = False
-        else:
-            if any(w in texto_b for w in terminos_bloqueo):
-                bloquea = True
-            else:
-                bloquea = False
+        # Bloqueo: las frases que niegan el bloqueo prevalecen sobre las que lo afirman
+        bloquea = not ya_resuelto and not contiene("no_bloquea") and contiene("bloqueo")
 
         # Plazo: evitar falsos positivos con adverbios "ya" en frases como "ya está bien"
         if ya_resuelto:
             plazo = "ninguno"
-        elif any(w in texto_b for w in [
-            "en una hora", "en 15 minutos", "hoy vence", "vence hoy",
-            "empieza ya", "es ya", "entrega hoy", "en media hora",
-            "en 30 minutos", "en 10 minutos", "en 20 minutos", "tengo clase ya",
-            "clase en una hora", "en este momento", "plazo maximo hoy", "cierra en minutos",
-            "cierra hoy", "ultimo dia", "ahora mismo", "presento ahora",
-            "vence en una hora", "vence en 30 minutos", "vence en 15 minutos",
-            "vence en 10 minutos",
-            "en medio de un parcial", "en medio de un examen", "examen en curso",
-            "estoy presentando un examen", "estoy haciendo un examen ahora",
-            "mi examen esta en curso", "durante el parcial",
-            "parcial en curso", "evaluacion en curso", "sustentacion en curso",
-            "parcial ahora", "examen ahora", "empieza en este momento"
-        ]):
+        elif contiene("plazo_inmediato"):
             plazo = "inmediato"
-        elif any(w in texto_b for w in [
-            "manana", "viernes", "proxima semana", "pocos dias", "este fin de semana",
-            "fecha limite", "esta noche", "en 24 horas", "en 48 horas", "en dos dias",
-            "limite de entrega", "en tres dias", "en 3 dias", "en cuatro dias",
-            "en 4 dias", "en cinco dias", "en 5 dias", "en 72 horas",
-            "mas adelante", "proximo semestre"
-        ]):
+        elif contiene("plazo_cercano"):
             plazo = "cercano"
         else:
             plazo = "ninguno"
 
-        senales_navegador = (
-            "navegador", "sitio sospechoso", "sitio extraño", "pagina extraña",
-            "pagina sospechosa", "atrapado en paginas", "atrapado en una pagina",
-            "me redirige", "ventanas emergentes", "pop ups",
-        )
         incidente_navegador_en_evaluacion = (
             bloquea
             and plazo == "inmediato"
-            and any(senal in texto_b for senal in senales_navegador)
-            and any(senal in texto_b for senal in ("examen", "parcial", "evaluacion", "sustentacion"))
+            and contiene("navegador")
+            and contiene("evaluacion")
         )
 
         # Alternativa
-        tiene_alt = any(w in texto_b for w in [
-            "desde el celular", "otro computador", "otro dispositivo", "amigo",
-            "otra sala", "en la app movil", "usando datos", "en otro navegador",
-            "en modo incognito", "desde mi casa", "otro correo", "ir a tesoreria",
-            "puedo ir a tesoreria", "desde tesoreria", "otra sede", "otro laboratorio"
-        ])
-        sin_alt = any(w in texto_b for w in [
-            "no tengo otra forma", "no tengo otra manera", "sin alternativa",
-            "es la unica forma", "unica manera", "no encuentro otra manera",
-            "no tengo otro equipo", "no tengo celular", "unico computador",
-            "no tengo como", "no tengo mas opciones"
-        ])
-        alternativa = tiene_alt and not sin_alt
+        alternativa = contiene("con_alternativa") and not contiene("sin_alternativa")
 
         return {
             "pred_urg": pred_urg,
@@ -426,15 +335,26 @@ class AgenteTriaje:
 
         # B. Aprendizaje Activo por Casos (CBR): ¿Un técnico humano corrigió un caso similar?
         caso_feedback = self.memoria.buscar_caso_similar(texto_busqueda, umbral=0.55)
-        if caso_feedback:
-            urg_previa = urgencia_final
-            urgencia_final = caso_feedback["urgencia_corregida"]
-            aprendizaje_humano_aplicado = True
-            deduccion_fol.trazabilidad_deductiva.append(
-                f"[APRENDIZAJE HUMANO] Caso similar al ticket #{caso_feedback.get('id_ticket', '?')} "
-                f"corregido previamente por el técnico a '{urgencia_final}' (Similitud: {caso_feedback.get('similitud', 0):.2f}). "
-                f"El agente adopta el aprendizaje humano."
+        urg_corregida = caso_feedback.get("urgencia_corregida") if caso_feedback else None
+        if urg_corregida in NIVELES_URGENCIA:
+            ref = (
+                f"Caso similar al ticket #{caso_feedback.get('id_ticket', '?')} corregido previamente "
+                f"por el técnico a '{urg_corregida}' (Similitud: {caso_feedback.get('similitud', 0):.2f})."
             )
+            if urgencia_final == "Crítica" and urg_corregida != "Crítica":
+                # Un caso parecido no basta para rebajar automáticamente una urgencia Crítica
+                # deducida por las reglas: se mantiene y se pide confirmación humana.
+                deduccion_fol.requiere_revision_humana = True
+                deduccion_fol.trazabilidad_deductiva.append(
+                    f"[APRENDIZAJE HUMANO] {ref} No se rebaja una urgencia Crítica por similitud; "
+                    "se mantiene y se solicita revisión humana."
+                )
+            else:
+                urgencia_final = urg_corregida
+                aprendizaje_humano_aplicado = True
+                deduccion_fol.trazabilidad_deductiva.append(
+                    f"[APRENDIZAJE HUMANO] {ref} El agente adopta el aprendizaje humano."
+                )
 
         # La seguridad física prevalece sobre ML, aprendizaje humano y deduplicación.
         if percepciones.get("riesgo_seguridad_personal", False):
@@ -519,7 +439,7 @@ class AgenteTriaje:
                 urgencia=urgencia_final,
                 es_falla=(percepciones["tipo"] == "falla"),
                 plataforma_id=asignacion_ont.plataforma_id,
-                carga_cola=12,
+                carga_cola=self.carga_cola,
                 limite_sla_horas=asignacion_ont.tiempo_max_resolucion_horas,
             )
 

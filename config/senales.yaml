@@ -1,0 +1,352 @@
+# Señales léxicas que usa la percepción del agente (src/triage/agent.py).
+# Cada lista contiene frases que se buscan como subcadenas en "asunto + descripción".
+# El texto del ticket se normaliza sin tildes y en minúsculas antes de buscar, y las
+# frases de este archivo se normalizan igual al cargarlas: pueden escribirse con o sin tildes.
+# Al agregar frases, vuelve a ejecutar tests/test_priority_cases.py.
+
+riesgo_seguridad_personal:
+- mano atrapada
+- mano atorada
+- dedo atrapado
+- dedos atrapados
+- brazo atrapado
+- brazo atorado
+- pierna atrapada
+- pierna atorada
+- no puedo sacar la mano
+- no puedo sacar el brazo
+- me voy a desmayar
+- me estoy desmayando
+- creo que me desmayo
+- no puedo respirar
+- dificultad para respirar
+- dolor en el pecho
+- sangrado abundante
+- convulsionando
+- perdi el conocimiento
+
+incidente_resuelto:
+- ya todo esta bien
+- ya esta bien
+- ya funciona
+- ya se arreglo
+- ya se soluciono
+- solo duro
+- duro 5 minutos
+- era solo una actualizacion
+- ya pude entrar
+- ya tengo acceso
+- falsa alarma
+- no era nada
+- se arreglo solo
+- se soluciono solo
+
+consulta:
+- como
+- quisiera saber
+- consulta
+- pregunta
+- donde
+- orientacion
+- procedimiento
+- proceso
+- requisitos
+- informacion sobre
+- solicito saber
+- como puedo
+- donde puedo
+- que debo hacer
+- solicitud de
+- inquietud
+- como descargar
+- como instalar
+- como pagar
+- como ingresar por primera vez
+- instrucciones
+- tutorial
+- guia
+- se puede
+- no se si
+- solo quiero confirmar
+- quiero confirmar
+- me gustaria saber
+- es posible
+- cuantos
+- cuantas
+- hasta que hora
+
+falla:
+- error
+- fallo
+- falla
+- no funciona
+- caido
+- bloqueado
+- denegado
+- no tengo acceso
+- no abre
+- se congela
+- pantalla negra
+- pantallazo
+- se cierra
+- no me deja
+- no puedo ingresar
+- no conecta
+- sin internet
+- sin conexion
+- dañado
+- interrupcion
+- lentitud extrema
+- no se puede
+- no puedo salir
+- no puedo cerrar
+- no puedo volver al examen
+- sitio sospechoso
+- sitio extraño
+- pagina extraña
+- pagina sospechosa
+- me redirige
+- ventanas emergentes
+- pop ups
+- navegador bloqueado
+- atrapado en paginas
+- atrapado en una pagina
+- no puedo pagar
+- no puedo enviar
+- no puedo usar
+- no puedo hacer
+- no enciende
+- no encienden
+- no hay wifi
+- sin wifi
+- no hay internet
+- restablecimiento no me llega
+- nadie de mi programa puede entrar
+- nadie puede entrar
+- nadie puede conectarse
+
+alcance_institucional:
+- toda la universidad
+- todo el campus
+- a todos los estudiantes
+- nadie en la universidad
+- todo el edificio
+- en toda la sede
+- caida masiva
+- caida general
+- a nivel general
+- servidor caido
+- a nadie le funciona
+- nadie de mi programa
+- nadie del programa
+- a todo mi programa
+- todos los estudiantes de mi programa
+- nadie puede entrar
+- nadie puede conectarse
+
+alcance_grupo:
+- todo el salon
+- mi grupo
+- varios companeros
+- a todos nos sale
+- en mi clase
+- en la sala
+- en el laboratorio
+- a varios
+- a todo el curso
+- en el bloque
+- todo el piso
+- varios estamos afectados
+
+no_bloquea:
+- puedo seguir trabajando
+- no es grave
+- solo queria reportarlo
+- no me impide
+- ya todo esta bien
+- ya esta bien
+- ya funciona
+- ya pude
+- duro 5 minutos
+- era solo una actualizacion
+- solo es una duda
+- solo quiero saber
+- es informativo
+- funciona pero
+- solo queria preguntar
+- puedo seguir conectado
+- puedo trabajar
+- igual puedo trabajar
+- igual puedo
+- a veces
+- por momentos
+- solo lo reporto
+- no tengo afan
+- cruce de horarios
+
+bloqueo:
+- no tengo acceso
+- bloqueado
+- acceso denegado
+- no me deja entrar
+- no puedo ingresar
+- completamente bloqueado
+- no puedo continuar
+- no deja hacer nada
+- imposible acceder
+- no puedo presentar
+- no me deja pagar
+- no puedo enviar
+- no puedo matricular
+- cuenta suspendida
+- no carga el examen
+- no abre el examen
+- se queda en blanco
+- clave incorrecta
+- no me deja
+- no abre
+- no carga
+- no inicia
+- no funciona
+- no responde
+- no puedo salir
+- no puedo cerrar la pagina
+- no puedo cerrar el navegador
+- no puedo volver al examen
+- atrapado en paginas
+- atrapado en una pagina
+- navegador bloqueado
+- no responde el navegador
+- me redirige una y otra vez
+- no conecta
+- no me deja usar
+- no puedo usar
+- no puedo conectarme
+- no me deja conectarme
+- no hay wifi
+- sin wifi
+- no hay internet
+- nadie puede conectarse
+- se cerro el programa
+- nadie de mi programa puede entrar
+- no me aparece abierta la inscripcion
+- error al pagar
+- no puedo pagar
+- no se puede ingresar
+- no se puede conectar
+- error al unir
+- restablecimiento no me llega
+- no puedo hacer mis actividades
+- no encienden
+- no enciende
+
+plazo_inmediato:
+- en una hora
+- en 15 minutos
+- hoy vence
+- vence hoy
+- empieza ya
+- es ya
+- entrega hoy
+- en media hora
+- en 30 minutos
+- en 10 minutos
+- en 20 minutos
+- tengo clase ya
+- clase en una hora
+- en este momento
+- plazo maximo hoy
+- cierra en minutos
+- cierra hoy
+- ultimo dia
+- ahora mismo
+- presento ahora
+- vence en una hora
+- vence en 30 minutos
+- vence en 15 minutos
+- vence en 10 minutos
+- en medio de un parcial
+- en medio de un examen
+- examen en curso
+- estoy presentando un examen
+- estoy haciendo un examen ahora
+- mi examen esta en curso
+- durante el parcial
+- parcial en curso
+- evaluacion en curso
+- sustentacion en curso
+- parcial ahora
+- examen ahora
+- empieza en este momento
+
+plazo_cercano:
+- manana
+- viernes
+- proxima semana
+- pocos dias
+- este fin de semana
+- fecha limite
+- esta noche
+- en 24 horas
+- en 48 horas
+- en dos dias
+- limite de entrega
+- en tres dias
+- en 3 dias
+- en cuatro dias
+- en 4 dias
+- en cinco dias
+- en 5 dias
+- en 72 horas
+- mas adelante
+- proximo semestre
+
+navegador:
+- navegador
+- sitio sospechoso
+- sitio extraño
+- pagina extraña
+- pagina sospechosa
+- atrapado en paginas
+- atrapado en una pagina
+- me redirige
+- ventanas emergentes
+- pop ups
+
+evaluacion:
+- examen
+- parcial
+- evaluacion
+- sustentacion
+
+con_alternativa:
+- desde el celular
+- otro computador
+- otro dispositivo
+- amigo
+- otra sala
+- en la app movil
+- usando datos
+- en otro navegador
+- en modo incognito
+- desde mi casa
+- otro correo
+- ir a tesoreria
+- puedo ir a tesoreria
+- desde tesoreria
+- otra sede
+- otro laboratorio
+
+sin_alternativa:
+- no tengo otra forma
+- no tengo otra manera
+- sin alternativa
+- es la unica forma
+- unica manera
+- no encuentro otra manera
+- no tengo otro equipo
+- no tengo celular
+- unico computador
+- no tengo como
+- no tengo mas opciones
+

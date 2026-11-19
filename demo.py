@@ -7,18 +7,12 @@ Permite ejecutar los casos de prueba clave requeridos por la rúbrica docente:
 4. Caso interactivo: el evaluador o estudiante puede redactar cualquier ticket en vivo
 """
 
-import os
 import sys
 import time
 from pathlib import Path
 import json
 
 RAIZ = Path(__file__).resolve().parent
-
-# Si se ejecuta con el python global del sistema, re-ejecutar automáticamente con .venv
-venv_python = RAIZ / ".venv" / "bin" / "python"
-if venv_python.exists() and sys.executable != str(venv_python) and "VIRTUAL_ENV" not in os.environ:
-    os.execv(str(venv_python), [str(venv_python)] + sys.argv)
 
 sys.path.insert(0, str(RAIZ / "src"))
 
@@ -188,4 +182,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # Si se ejecuta con el python global y existe .venv, relanza con el del venv
+    # (vía main.py, que acepta los mismos comandos: "demo" e "interactivo").
+    from main import reejecutar_con_venv
+    reejecutar_con_venv()
     main()

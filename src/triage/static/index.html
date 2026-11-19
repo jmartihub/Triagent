@@ -547,7 +547,7 @@
         </h2>
         <form id="form-ticket" onsubmit="enviarTicket(event)" class="space-y-4 text-xs">
           <div>
-            <label class="block font-medium text-slate-400 mb-1">Formulario en Tooli</label>
+            <label for="formulario_elegido" class="block font-medium text-slate-400 mb-1">Formulario en Tooli</label>
             <select id="formulario_elegido" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-slate-500">
               <option value="Fallas Técnicas TIC">Fallas Técnicas TIC</option>
               <option value="Procesos de Pago">Procesos de Pago</option>
@@ -556,7 +556,7 @@
             </select>
           </div>
           <div>
-            <label class="block font-medium text-slate-400 mb-1">Subcategoría / Apoyo Requerido</label>
+            <label for="apoyo" class="block font-medium text-slate-400 mb-1">Subcategoría / Apoyo Requerido</label>
             <select id="apoyo" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-slate-500">
               <option value="Teams">Teams</option>
               <option value="Red / Wi-Fi">Red / Wi-Fi</option>
@@ -571,11 +571,11 @@
             </select>
           </div>
           <div>
-            <label class="block font-medium text-slate-400 mb-1">Asunto</label>
+            <label for="asunto" class="block font-medium text-slate-400 mb-1">Asunto</label>
             <input type="text" id="asunto" required placeholder="Ej: No puedo ingresar al portal" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-slate-500" value="No puedo entrar a la plataforma">
           </div>
           <div>
-            <label class="block font-medium text-slate-400 mb-1">Descripción detallada</label>
+            <label for="descripcion" class="block font-medium text-slate-400 mb-1">Descripción detallada</label>
             <textarea id="descripcion" rows="4" required class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200 focus:outline-none focus:border-slate-500" placeholder="Descripción del incidente...">No me deja entrar a la plataforma y presento un examen parcial en una hora. No tengo otra forma de presentarlo.</textarea>
           </div>
           <div class="pt-2 flex flex-col sm:flex-row gap-2">
@@ -690,7 +690,7 @@
           <button onclick="filtrarTickets('En curso')" id="filtro-encurso" class="filter-btn px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-800">En curso</button>
         </div>
         <div class="w-full sm:w-64">
-          <input type="text" id="busqueda-ticket" oninput="buscarTicket()" placeholder="Filtrar por asunto, ID..." class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600 text-xs">
+          <input type="text" id="busqueda-ticket" aria-label="Filtrar tickets por asunto o ID" oninput="buscarTicket()" placeholder="Filtrar por asunto, ID..." class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600 text-xs">
         </div>
       </div>
 

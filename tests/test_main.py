@@ -65,7 +65,18 @@ def test_cargar_entorno_local_respeta_la_terminal_y_lee_token():
             assert os.environ["GLPI_APP_TOKEN"] == "app-token"
 
 
+def test_relanzar_con_venv_solo_acepta_comandos_y_puertos_validos():
+    assert main.argumentos_validados([]) == []
+    assert main.argumentos_validados(["WEB", "5000"]) == ["web", "5000"]
+    assert main.argumentos_validados(["interactivo"]) == ["interactivo"]
+    assert main.argumentos_validados(["web", "5000; rm -rf /"]) is None
+    assert main.argumentos_validados(["web", "70000"]) is None
+    assert main.argumentos_validados(["--desconocido"]) is None
+    assert main.argumentos_validados(["demo", "1", "2"]) is None
+
+
 if __name__ == "__main__":
+    test_relanzar_con_venv_solo_acepta_comandos_y_puertos_validos()
     test_web_inicia_compose_y_espera_a_glpi()
     test_web_muestra_fallo_al_iniciar_docker_compose()
     test_cargar_entorno_local_respeta_la_terminal_y_lee_token()

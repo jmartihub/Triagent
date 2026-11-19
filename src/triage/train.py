@@ -45,7 +45,7 @@ def nuevo_modelo():
         ("letras", TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), min_df=3,
                                    sublinear_tf=True, strip_accents="unicode")),
     ])
-    clf = LogisticRegression(max_iter=2000, C=4.0, class_weight="balanced")
+    clf = LogisticRegression(max_iter=2000, C=4.0, class_weight="balanced", random_state=SEMILLA)
     return Pipeline([("vec", vec), ("clf", clf)])
 
 
@@ -112,11 +112,11 @@ def evaluar_conjunto(nombre, df, m_urg, m_form, resultados, mostrar_errores=Fals
           f"({d['marcados']} marcados / {d['reales']} reales)")
     if mostrar_errores:
         print("\nErrores de urgencia:")
-        for i in np.where(pred_u != df.urgencia.values)[0]:
+        for i in np.nonzero(pred_u != df.urgencia.values)[0]:
             fila = df.iloc[i]
             print(f"  real={fila.urgencia:8s} pred={pred_u[i]:8s} | {fila.asunto} | {fila.descripcion[:110]}")
         print("\nErrores de formulario correcto:")
-        for i in np.where(pred_f != df.formulario_correcto.values)[0]:
+        for i in np.nonzero(pred_f != df.formulario_correcto.values)[0]:
             fila = df.iloc[i]
             print(f"  real={fila.formulario_correcto} pred={pred_f[i]} | {fila.descripcion[:90]}")
 

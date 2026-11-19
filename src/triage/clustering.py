@@ -128,7 +128,7 @@ class DetectorIncidentesNoSupervisado:
         alerta = None
 
         if cluster_nuevo != -1:  # -1 es ruido en DBSCAN
-            miembros_idx = np.where(etiquetas == cluster_nuevo)[0]
+            miembros_idx = np.nonzero(etiquetas == cluster_nuevo)[0]
             tamano_cluster = len(miembros_idx)
 
             # Criterio ITIL e Ingeniería de Servicios:

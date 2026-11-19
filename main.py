@@ -58,10 +58,37 @@ def reejecutar_con_venv():
         or Path(sys.executable).resolve() == venv_python.resolve()
     ):
         return
+    argumentos = argumentos_validados(sys.argv[1:])
+    if argumentos is None:
+        return  # Argumentos desconocidos: main() mostrará la ayuda sin relanzar nada.
+    comando = [str(venv_python), str(Path(__file__).resolve()), *argumentos]
     if os.name == "nt":
         # En Windows os.execv no reemplaza el proceso y rompe la consola; se usa un subproceso.
-        sys.exit(subprocess.call([str(venv_python)] + sys.argv))
-    os.execv(str(venv_python), [str(venv_python)] + sys.argv)
+        sys.exit(subprocess.call(comando))
+    os.execv(str(venv_python), comando)
+
+
+COMANDOS = {
+    nombre: nombre
+    for nombre in (
+        "demo", "interactivo", "interactive", "web", "dashboard", "front",
+        "generate", "train", "deep", "sla", "all",
+    )
+}
+
+
+def argumentos_validados(argumentos):
+    """Devuelve los argumentos como valores conocidos (comando y puerto) o None si no son válidos."""
+    if not argumentos:
+        return []
+    comando = COMANDOS.get(argumentos[0].lower())
+    if comando is None or len(argumentos) > 2:
+        return None
+    if len(argumentos) == 1:
+        return [comando]
+    if not argumentos[1].isdigit() or not 1 <= int(argumentos[1]) <= 65535:
+        return None
+    return [comando, str(int(argumentos[1]))]
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
